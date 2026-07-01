@@ -31,9 +31,14 @@ if (read_config_option('storage_location')) {
 }
 
 function escape_command($command) {
-	return $command;		# we escape every single argument now, no need for 'special' escaping
-	#return preg_replace("/(\\\$|`)/", "", $command); # current cacti code
-	#TODO return preg_replace((\\\$(?=\w+|\*|\@|\#|\?|\-|\\\$|\!|\_|[0-9]|\(.*\))|`(?=.*(?=`)))","$2", $command);  #suggested by ldevantier to allow for a single $
+	global $config;
+
+	if ($config['cacti_server_os'] == 'win32') {
+		// On Windows, quote .rrd paths containing spaces for the rrdtool pipe
+		$command = preg_replace('/\b([A-Za-z]:[^\s]* [^\s]*\.rrd)\b/i', '"$1"', $command);
+	}
+
+	return $command;
 }
 
 /** set the language environment variable for rrdtool functions

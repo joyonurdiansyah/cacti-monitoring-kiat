@@ -225,8 +225,23 @@ while (1) {
 					switch ($i) {
 					case 0:
 						/* cut off include file as first part of input string and keep rest for further parsing */
-						$include_file = trim(substr($input_string,0,$pos));
-						$input_string = trim(strchr($input_string, ' ')) . ' ';
+						// On Windows, Cacti base_path may contain spaces. Use .php extension as a reliable boundary.
+						$php_pos = stripos($input_string, '.php ');
+
+						if ($php_pos !== false) {
+							$include_file = trim(substr($input_string, 0, $php_pos + 4));
+							$input_string = trim(substr($input_string, $php_pos + 5)) . ' ';
+						} else {
+							$php_pos = stripos($input_string, '.php');
+
+							if ($php_pos !== false && ($php_pos + 4) == strlen($input_string)) {
+								$include_file = $input_string;
+								$input_string = ' ';
+							} else {
+								$include_file = trim(substr($input_string,0,$pos));
+								$input_string = trim(strchr($input_string, ' ')) . ' ';
+							}
+						}
 						break;
 					case 1:
 						/* cut off function as second part of input string and keep rest for further parsing */

@@ -27,3 +27,6 @@ Thumbs.db
 
 # Local dev tooling
 notepad.md
+
+# Template monitoring files (device exports, CSV data, etc.)
+template_monitoring/
