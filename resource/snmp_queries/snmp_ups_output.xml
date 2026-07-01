@@ -1,0 +1,45 @@
+<ups>
+        <name>Get UPS output Information</name>
+        <description>Get SNMP UPS outpu values voltage,ampers, watts, load</description>
+        <index_order_type>numeric</index_order_type>
+        <oid_index>.1.3.6.1.2.1.33.1.4.4.1</oid_index>
+        <oid_index_parse>OID/REGEXP:.*\.([0-9]{1,3})$</oid_index_parse>
+
+        <fields>
+                <upsOutputLineIndex>
+                        <name>Index</name>
+                        <method>walk</method>
+                        <source>value</source>
+                        <direction>input</direction>
+                        <oid>.1.3.6.1.2.1.33.1.4.4.1</oid>
+                </upsOutputLineIndex>
+                <upsOutputVoltage>
+	                <name>Voltage</name>
+                        <method>walk</method>
+                        <source>value</source>
+                        <direction>output</direction>
+                        <oid>.1.3.6.1.2.1.33.1.4.4.1.2</oid>
+                </upsOutputVoltage>
+                <upsOutputAmper>
+	                <name>Amper</name>
+                        <method>walk</method>
+                        <source>value</source>
+                        <direction>output</direction>
+                        <oid>.1.3.6.1.2.1.33.1.4.4.1.3</oid>
+                </upsOutputAmper>
+                <upsOutputWatt>
+	                <name>Watt</name>
+                        <method>walk</method>
+                        <source>value</source>
+                        <direction>output</direction>
+                        <oid>.1.3.6.1.2.1.33.1.4.4.1.4</oid>
+                </upsOutputWatt>
+                <upsOutputLoad>
+	                <name>Load</name>
+                        <method>walk</method>
+                        <source>value</source>
+                        <direction>output</direction>
+                        <oid>.1.3.6.1.2.1.33.1.4.4.1.5</oid>
+                </upsOutputLoad>
+        </fields>
+</ups>

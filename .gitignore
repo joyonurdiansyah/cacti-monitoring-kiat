@@ -1,0 +1,29 @@
+# Cacti config with DB credentials (DO NOT COMMIT)
+include/config.php
+
+# Log files
+*.log
+log/
+
+# RRD files
+rra/
+
+# Cache directories
+cache/boost/
+cache/mibcache/
+cache/realtime/
+cache/spikekill/
+cache/verify/
+
+# Composer
+composer.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+
+# Local dev tooling
+notepad.md
