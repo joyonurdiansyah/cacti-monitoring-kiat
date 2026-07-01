@@ -8,6 +8,73 @@ Mikrotik RouterOS, Ubiquiti AP, dan perangkat Linux/Windows.
 
 ---
 
+## Perbandingan Versi: 1.2.26 vs 1.2.31
+
+Cacti 1.2.31 adalah **major security release** dengan 30+ perbaikan CVE dibanding 1.2.26.
+Berikut ringkasan perbedaan utama:
+
+### Riwayat Rilis
+
+| Versi | Tanggal | Catatan |
+|-------|---------|---------|
+| **1.2.26** | 24 Des 2023 | Versi awal project |
+| **1.2.27** | 12 Mei 2024 | 5 security fix (termasuk CVE-2024-25641 RCE) |
+| **1.2.28** | 6 Okt 2024 | 4 security fix, jQuery, jQueryUI, billboard.js update |
+| **1.2.29** | 2 Feb 2025 | 6 security fix, HPE Nimble/Alletra template |
+| **1.2.30** | 23 Mar 2025 | Bugfix only (6 issue) |
+| **1.2.31** | 15 Jun 2026 | **30+ security fix**, PHP 8.1 minimum |
+
+### Perubahan Penting
+
+| Aspek | 1.2.26 | 1.2.31 |
+|-------|--------|--------|
+| **PHP minimal** | 7.4+ | **8.1+** (breaking) |
+| **Security fix** | 6 CVE | **30+ CVE** (SQLi, XSS, RCE, Auth bypass, dll) |
+| **Device templates** | Bawaan | +Aruba Clearpass, HPE Nimble/Alletra, Dell iDRAC |
+| **Third-party libs** | jQuery 3.x lama | jQuery 3.7.1, jQueryUI 1.14.0, DOMPurify 3.4.7, PHPMailer 6.10 |
+| **jstree** | Versi lama | 3.3.17 (CSP Level 3 compliance) |
+
+### Perubahan Database (Schema)
+
+**Tidak ada tabel baru** antara 1.2.26 → 1.2.31. Hanya perubahan ALTER TABLE:
+
+| Versi | Perubahan |
+|-------|-----------|
+| 1.2.26 | `settings.value` dan `settings_user.value` diubah ke `varchar(4096)`; dedup tabel `colors` |
+| 1.2.27 | `snmp_priv_protocol` di 5 tabel diubah dari `char(6)` → `char(7)`; hapus duplikat `data_input_fields` |
+| 1.2.31 | `settings.name` dan `settings_user.name` diperlebar `varchar(75)` → `varchar(255)`; tambah index di `snmp_query_graph` |
+
+### Perubahan Menu / UI
+
+Tidak ada restrukturasi menu besar. Perubahan bersifat inkremental:
+
+| Versi | Perubahan UI |
+|-------|-------------|
+| 1.2.27 | Indikator device enabled/disabled di daftar graph; filter Device Templates by Graph Templates |
+| 1.2.28 | Kolom Location & Site di Graph List View; filter/sort user by group & last login; default graph end time 24 jam penuh |
+| 1.2.29 | IPv6 format tanpa port didukung |
+| 1.2.31 | Autocomplete standar di halaman Login & Change Password |
+
+### Keamanan Kritis di 1.2.31
+
+Beberapa CVE penting yang **tidak ada** di 1.2.26:
+
+| CVE | Kerentanan |
+|-----|-----------|
+| CVE-2026-39893 | **Pre-auth SQL injection** via rfilter RLIKE di graph_view.php |
+| CVE-2026-39894 | RRDtool metric shift via LC_NUMERIC locale comma |
+| CVE-2026-39949 | **Authenticated RCE** via Host Variable Injection |
+| CVE-2026-40078 | Backend ORDER BY SQL Injection |
+| CVE-2026-40082 | Session Fixation via missing session_regenerate_id() |
+| CVE-2026-40941 | Package Import Signature Validation Bypass |
+| CVE-2026-46531 | SQL Injection di automation_tree_rules.php |
+| CVE-2026-22802 | Authentication Bypass → information disclosure |
+
+**Kesimpulan:** Upgrade ke 1.2.31 wajib dilakukan karena menutup banyak celah keamanan kritis
+yang ada di 1.2.26, terutama pre-auth SQL injection dan RCE.
+
+---
+
 ## Prasyarat
 
 ### PHP
