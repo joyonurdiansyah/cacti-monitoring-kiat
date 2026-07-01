@@ -1,0 +1,80 @@
+# =============================================================================
+# Cacti Monitoring — Docker Compose
+# =============================================================================
+# Environment: copy .env.example to .env and edit credentials before running.
+#
+# Usage:
+#   docker compose up -d             # Start all services
+#   docker compose down              # Stop all services
+#   docker compose logs -f           # Follow logs
+#   docker compose exec cacti-web bash   # Shell into web container
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Cacti Database — MySQL 8.0
+  # Stored on host port 3310 to avoid conflict with Laragon MySQL (port 3306)
+  # ---------------------------------------------------------------------------
+  cacti-db:
+    image: mysql:8.0
+    container_name: cacti-mysql
+    restart: unless-stopped
+    networks:
+      - cacti-network
+    ports:
+      - "${CACTI_DB_PORT:-3310}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?err}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-cacti}
+      MYSQL_USER: ${MYSQL_USER:-cactiuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?err}
+      TZ: ${TZ:-Asia/Jakarta}
+    volumes:
+      - cacti-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Cacti Web + Poller — Apache, PHP 8.1, RRDtool, SNMP, Cron
+  # Stored on host port 8090 to avoid conflict with OCS Inventory (port 8080)
+  # ---------------------------------------------------------------------------
+  cacti-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cacti-web
+    restart: unless-stopped
+    networks:
+      - cacti-network
+    ports:
+      - "${CACTI_WEB_PORT:-8090}:80"
+    environment:
+      CACTI_DB_HOST: cacti-db
+      CACTI_DB_PORT: "3306"
+      CACTI_DB_NAME: ${MYSQL_DATABASE:-cacti}
+      CACTI_DB_USER: ${MYSQL_USER:-cactiuser}
+      CACTI_DB_PASS: ${MYSQL_PASSWORD:?err}
+      CACTI_URL_PATH: ${CACTI_URL_PATH:-/}
+      TZ: ${TZ:-Asia/Jakarta}
+    volumes:
+      - cacti-rra-data:/var/www/html/rra
+      - ./log:/var/www/html/log
+    depends_on:
+      cacti-db:
+        condition: service_healthy
+
+networks:
+  cacti-network:
+    name: cacti-network
+    driver: bridge
+
+volumes:
+  cacti-mysql-data:
+    name: cacti-mysql-data
+  cacti-rra-data:
+    name: cacti-rra-data

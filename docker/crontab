@@ -1,0 +1,8 @@
+# Cacti Poller — runs every 5 minutes
+*/5 * * * * www-data php /var/www/html/poller.php > /dev/null 2>&1
+
+# Cacti Maintenance — hourly
+15 * * * * www-data php /var/www/html/poller_maintenance.php > /dev/null 2>&1
+
+# Cacti RRDcheck — every 6 hours
+15 */6 * * * www-data php /var/www/html/poller_rrdcheck.php > /dev/null 2>&1
