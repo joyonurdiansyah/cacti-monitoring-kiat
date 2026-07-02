@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #+-------------------------------------------------------------------------+
 #| Copyright (C) 2004-2026 The Cacti Group                                 |
 #|                                                                         |
@@ -20,30 +20,41 @@
 #| http://www.cacti.net/                                                   |
 #+-------------------------------------------------------------------------+
 
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd $SCRIPTPATH/../../
-FILES1=`find cli -name \*.php | grep -v "index.php" | sort`
-FILES2=`ls -1 poller*.php | egrep -v "(index.php|pollers.php)" | sort`
+SCRIPTPATH="$( cd "$(dirname "$0")" || exit ; pwd -P )"
+cd "${SCRIPTPATH}/../../" || exit
+FILES1=$(find cli -name \*.php | grep -v "index.php" | sort)
+FILES2=$(find . -maxdepth 1 -name 'poller*.php' | grep -E -v "(index.php|pollers.php)" | sort)
 FILES3="cactid.php cmd.php"
+# shellcheck disable=SC2009 # pgrep lacks awk/user-filtering in one step; ps pipeline required
+WEBUSER=$(ps -ef | grep -E '(httpd|apache2|apache)' | grep -v "$(whoami)" | grep -v root | head -n1 | awk '{print $1}')
+PWD=$(pwd)
 
 FAILED=0
+HEADER="#!/usr/bin/env php"
+
+echo "Current User is: $(whoami)"
+echo "Web User is: ${WEBUSER}"
+echo "Working Directory: ${PWD}"
+
 for script in $FILES1 $FILES2 $FILES3; do
 	if [[ $script == "index.php" ]]; then
 		continue;
 	fi
 
-	echo Testing script: $script
-	script_output=`head -n 1 $script`
-	if [[ $script_output != "#!/usr/bin/env php" ]]; then
+	echo "Testing script: ${script}"
+	script_output=$(head -n 1 "${script}")
+	if [[ "${script_output}" != "$HEADER" ]]; then
 		FAILED=2
-		echo "   x Failed header check (" $script_output ")"
+		echo "   x Failed header check (${script_output})"
+		echo "       - should be '${HEADER}'"
+		echo "       -     found '${script_output}'"
 	fi
 
-	script_output=`php -q $script --version`
+	script_output=$(php -q "${script}" --version)
 	script_result=$?
-	script_lines=`echo "$script_output" | wc -l`
+	script_lines=$(echo "${script_output}" | wc -l)
 
-	if [[ $script_output == *"System log file is not available for writing"* ]]; then
+	if [[ "${script_output}" == *"System log file is not available for writing"* ]]; then
 		FAILED=1
 		echo "Please run this test as the website user";
 		break;
@@ -51,35 +62,35 @@ for script in $FILES1 $FILES2 $FILES3; do
 
 	if [[ $script_result -ne 0 ]]; then
 		FAILED=2
-		echo "   x Failed version result test (" $script_result ")"
+		echo "   x Failed version result test (${script_result})"
 		echo "   ==============================================================================="
-		echo $script_output
+		echo "${script_output}"
 		echo "   ==============================================================================="
 	fi
 
 	if [[ $script_lines -ne 1 ]]; then
 		FAILED=3
-		echo "   x Failed version output test (" $script_lines ")";
+		echo "   x Failed version output test (${script_lines})";
 		echo "   ==============================================================================="
-		echo $script_output
+		echo "${script_output}"
 		echo "   ==============================================================================="
 	fi
 
-	script_output=`php -q $script --help`
+	script_output=$(php -q "${script}" --help)
 	script_result=$?
-	script_lines=`echo "$script_output" | wc -l`
+	script_lines=$(echo "${script_output}" | wc -l)
 
 	if [[ $script_result -ne 0 ]]; then
 		FAILED=4
-		echo "   x Failed help result test (" $script_result ")"
+		echo "   x Failed help result test (${script_result})"
 		echo "   ==============================================================================="
-		echo $script_output
+		echo "${script_output}"
 		echo "   ==============================================================================="
 	fi
 
 	if [[ $script_lines -lt 3 ]]; then
 		FAILED=5
-		echo "   x Failed help output test (" $script_lines ")";
+		echo "   x Failed help output test (${script_lines})";
 	fi
 done
 exit $FAILED

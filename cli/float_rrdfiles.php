@@ -32,112 +32,120 @@ if (function_exists('pcntl_async_signals')) {
 ini_set('output_buffering', 'Off');
 
 require(__DIR__ . '/../include/cli_check.php');
-require_once($config['base_path'] . '/lib/poller.php');
-require_once($config['base_path'] . '/lib/rrd.php');
+require_once(CACTI_PATH_LIBRARY . '/poller.php');
+require_once(CACTI_PATH_LIBRARY . '/rrd.php');
 
-/* process calling arguments */
+// process calling arguments
 $parms = $_SERVER['argv'];
 array_shift($parms);
 
-/* system controlled parameters */
+// system controlled parameters
 $type              = 'rmaster';
 $thread_id         = 0;
 
-/* mandatory parameters */
-$start_time        = false;
-$end_time          = false;
+// mandatory parameters
+$start_time        = 0;
+$end_time          = 0;
 
-/* optional parameters for RRDfile selection */
-$host_id           = false;
-$host_template_id  = false;
-$graph_template_id = false;
-$local_graph_ids   = array();
+// optional parameters for RRDfile selection
+$host_id           = 0;
+$host_template_id  = 0;
+$graph_template_id = 0;
+$local_graph_ids   = [];
 $step              = false;
 
-/* optional for threading and verbose display */
-$threads           = 20;
+// optional for threading and verbose display
+$threads           = detect_cpu_cores();
+
+if ($threads == 0) {
+	$threads = 2;
+}
 $seebug            = false;
 
-/* optional for force handing and resume */
+// optional for force handing and resume
 $resume            = false;
 $forcerun          = false;
 
 if (cacti_sizeof($parms)) {
-	foreach($parms as $parameter) {
-		if (strpos($parameter, '=')) {
-			list($arg, $value) = explode('=', $parameter, 2);
+	foreach ($parms as $parameter) {
+		if (str_contains($parameter, '=')) {
+			[$arg, $value] = explode('=', $parameter, 2);
 		} else {
-			$arg = $parameter;
+			$arg   = $parameter;
 			$value = '';
 		}
 
 		switch ($arg) {
-		case '--force':
-			$forcerun = true;
+			case '--force':
+				$forcerun = true;
 
-			break;
-		case '--debug':
-			$seebug = true;
+				break;
+			case '--debug':
+				$seebug = true;
 
-			break;
-		case '--resume':
-			$resume = true;
+				break;
+			case '--resume':
+				$resume = true;
 
-			break;
-		case '--start':
-			$start_time = $value;
+				break;
+			case '--start':
+				$start_time = $value;
 
-			break;
-		case '--end':
-			$end_time = $value;
+				break;
+			case '--end':
+				$end_time = $value;
 
-			break;
-		case '--type':
-			$type = $value;
+				break;
+			case '--type':
+				$type = $value;
 
-			break;
-		case '--threads':
-			$threads = $value;
+				break;
+			case '--threads':
+				$threads = $value;
 
-			break;
-		case '--child':
-			$thread_id = $value;
+				break;
+			case '--child':
+				$thread_id = $value;
 
-			break;
-		case '--host-id':
-			$host_id = $value;
+				break;
+			case '--host-id':
+				$host_id = $value;
 
-			break;
-		case '--host-template_id':
-			$host_template_id = $value;
+				break;
+			case '--host-template_id':
+				$host_template_id = $value;
 
-			break;
-		case '--graph-template-id':
-			$graph_template_id = $value;
+				break;
+			case '--graph-template-id':
+				$graph_template_id = $value;
 
-			break;
-		case '--graph-ids':
-			$local_graph_ids = explode(',', $value);
+				break;
+			case '--graph-ids':
+				$local_graph_ids = explode(',', $value);
 
-			break;
-		case '--step':
-			$step = $value;
+				break;
+			case '--step':
+				$step = $value;
 
-			break;
-		case '--version':
-		case '-v':
-		case '-V':
-			display_version();
-			exit(0);
-		case '--help':
-		case '-h':
-		case '-H':
-			display_help();
-			exit(0);
-		default:
-			print 'ERROR: Invalid Parameter ' . $parameter . PHP_EOL . PHP_EOL;
-			display_help();
-			exit(1);
+				break;
+			case '--version':
+			case '-v':
+			case '-V':
+				display_version();
+
+				exit(0);
+			case '--help':
+			case '-h':
+			case '-H':
+				display_help();
+
+				exit(0);
+
+			default:
+				print 'ERROR: Invalid Parameter ' . $parameter . PHP_EOL . PHP_EOL;
+				display_help();
+
+				exit(1);
 		}
 	}
 }
@@ -150,29 +158,31 @@ if (cacti_sizeof($parms)) {
  *
  */
 
-/* install signal handlers for UNIX only */
+// install signal handlers for UNIX only
 if (function_exists('pcntl_signal')) {
 	pcntl_signal(SIGTERM, 'sig_handler');
 	pcntl_signal(SIGINT, 'sig_handler');
 }
 
-if ($start_time == false || $end_time == false) {
+if ($start_time == 0 || $end_time == 0) {
 	printf('ERROR: Both --start=TS and --end=TS are required and can be a timestamp or in date/time format' . PHP_EOL);
+
 	exit(1);
 }
 
-/* validate the start time */
+// validate the start time
 if (!is_numeric($start_time)) {
-	$ost = $start_time;
+	$ost        = $start_time;
 	$start_time = strtotime($start_time);
 
 	if ($start_time === false) {
 		printf('ERROR: The Start Time \'%s\' is not a valid date/time' . PHP_EOL, $ost);
+
 		exit(1);
 	}
 }
 
-/* validate the end time */
+// validate the end time
 if (!is_numeric($end_time)) {
 	$oet = $end_time;
 
@@ -180,48 +190,55 @@ if (!is_numeric($end_time)) {
 
 	if ($end_time === false) {
 		printf('ERROR: The End Time \'%s\' is not a valid date/time' . PHP_EOL, $oet);
+
 		exit(1);
 	}
 }
 
-/* validate the start and end times are sane */
+// validate the start and end times are sane
 if ($start_time >= $end_time) {
 	printf('ERROR: The Start Time \'%s\' is equal or grater to the End Time \'%s\' is not a valid date/time' . PHP_EOL, date('Y-m-d H:i:s', $start_time), date('Y-m-d H:i:s', $end_time));
+
 	exit(1);
 }
 
-/* perform some validation for host-id */
-if ($host_id !== false && ($host_id < 0 || !is_numeric($host_id))) {
+// perform some validation for host-id
+if ($host_id < 0) {
 	printf('ERROR: The value of %s for --host-id is invalid!' . PHP_EOL, $host_id);
+
 	exit(1);
 }
 
-/* perform some validation for host-template-id */
-if ($host_template_id !== false && ($host_template_id < 0 || !is_numeric($host_template_id))) {
+// perform some validation for host-template-id
+if ($host_template_id < 0) {
 	printf('ERROR: The value of %s for --host-template-id is invalid!' . PHP_EOL, $host_template_id);
+
 	exit(1);
 }
 
-/* perform some validation for graph-template-id */
-if ($graph_template_id !== false && ($graph_template_id < 0 || !is_numeric($graph_template_id))) {
+// perform some validation for graph-template-id
+if ($graph_template_id < 0) {
 	printf('ERROR: The value of %s for --graph-template-id is invalid!' . PHP_EOL, $graph_template_id);
+
 	exit(1);
 }
 
-/* perform some validation for step value */
-if ($step !== false && ($step < 0 || !is_numeric($step))) {
+// perform some validation for step value
+if ($step < 0) {
 	printf('ERROR: The value of %s for --step is invalid!' . PHP_EOL, $step);
+
 	exit(1);
 }
 
-/* perform some validation for step value */
+// perform some validation for step value
 if (cacti_sizeof($local_graph_ids)) {
-	foreach($local_graph_ids as $index => $value) {
-		$value = trim($value);
+	foreach ($local_graph_ids as $index => $value) {
+		$value                   = trim($value);
 		$local_graph_ids[$index] = $value;
 
 		if (!is_numeric($value) || empty($value) || $value <= 0) {
 			printf('ERROR: One of the values of %s for --graph-ids is invalid!' . PHP_EOL, $value);
+
 			exit(1);
 		}
 	}
@@ -231,24 +248,24 @@ if (cacti_sizeof($local_graph_ids)) {
 	$threads = 1;
 }
 
-/* take time and log performance data */
+// take time and log performance data
 $start = microtime(true);
 
-/* let's give this script lot of time to run for ever */
+// let's give this script lot of time to run for ever
 ini_set('max_execution_time', '0');
 ini_set('memory_limit', '-1');
 
-/* send a gentle message to the log and stdout */
+// send a gentle message to the log and stdout
 float_debug('Polling Starting');
 
-/* silently end if the registered process is still running */
+// silently end if the registered process is still running
 if (!$forcerun) {
 	if (!register_process_start('rfloat', $type, $thread_id, 86400)) {
 		exit(0);
 	}
 }
 
-/* Collect data as determined by the type */
+// Collect data as determined by the type
 switch ($type) {
 	case 'rmaster':
 		float_master_handler($forcerun, $resume, $host_id, $host_template_id, $graph_template_id, $local_graph_ids, $threads, $step, $start_time, $end_time);
@@ -256,11 +273,11 @@ switch ($type) {
 		unregister_process('rfloat', 'rmaster', 0);
 
 		break;
-	case 'child':  /* Launched by the rmaster process */
+	case 'child':  // Launched by the rmaster process
 		$rrdfiles = db_fetch_assoc_prepared('SELECT *
 			FROM poller_float_rrdfiles_not_done
 			WHERE process = ?',
-			array($thread_id));
+			[$thread_id]);
 
 		$child_start = microtime(true);
 
@@ -270,17 +287,17 @@ switch ($type) {
 			cacti_log(sprintf('Child Started Process %s with No RRDfiles', $thread_id), true, 'RFLOAT');
 		}
 
-		foreach($rrdfiles as $data) {
+		foreach ($rrdfiles as $data) {
 			print '.';
 
-			/* Update the rrdfile to current */
-			rrdtool_function_fetch($data['local_data_id'], time()-120, time());
+			// Update the rrdfile to current
+			rrdtool_function_fetch($data['local_data_id'], time() - 120, time());
 
 			float_rrdfile($data['rrd_path'], $data['local_data_id'], $step, $start_time, $end_time);
 
 			db_execute_prepared('DELETE FROM poller_float_rrdfiles_not_done
 				WHERE local_data_id = ?',
-				array($data['local_data_id']));
+				[$data['local_data_id']]);
 		}
 
 		$total_time = microtime(true) - $child_start;
@@ -300,15 +317,15 @@ exit(0);
  *   RRA's and will float around those ranges to ensure that there are
  *   no spikes.
  *
- * @param  (string) The RRDfile to update
- * @param  (int)    The local data id of the data source
- * @param  (int)    Any step size smaller than this will be skipped
- * @param  (int)    The float range start time as a unix timestamp
- * @param  (int)    The float range end time as a unix timestamp
+ * @param string $rrd_path      The RRDfile to update
+ * @param int    $local_data_id The local data id of the data source
+ * @param mixed  $step          Any step size smaller than this will be skipped
+ * @param int    $start_time    The float range start time as a unix timestamp
+ * @param int    $end_time      The float range end time as a unix timestamp
  *
- * @return (bool)   True if successful otherwise false
+ * @return bool - True if successful otherwise false
  */
-function float_rrdfile($rrd_path, $local_data_id, $step, $start_time, $end_time) {
+function float_rrdfile(string $rrd_path, int $local_data_id, mixed $step, int $start_time, int $end_time) : bool {
 	global $seebug;
 
 	static $rrdtool_bin = false;
@@ -326,7 +343,7 @@ function float_rrdfile($rrd_path, $local_data_id, $step, $start_time, $end_time)
 	$tmp_file   = $tmp_dir . '/' . $local_data_id . '.xml';
 
 	$return     = 0;
-	$output     = array();
+	$output     = [];
 	$command    = "$rrdtool_bin dump $rrd_path";
 	$db_prefix  = '                       ';
 
@@ -336,6 +353,7 @@ function float_rrdfile($rrd_path, $local_data_id, $step, $start_time, $end_time)
 
 			if ($return != 0) {
 				cacti_log(sprintf('ERROR: Unable to dump file %s to XML', $rrd_path), false, 'RFLOAT');
+
 				return false;
 			}
 
@@ -350,9 +368,12 @@ function float_rrdfile($rrd_path, $local_data_id, $step, $start_time, $end_time)
 				$in_range    = false;
 				$prev_data   = '';
 				$curstep     = 0;
+				$prev_line   = '';
+				$granularity = '';
+				$gdelta      = 0;
 
-				foreach($output as $line) {
-					if (strpos($line, '<pdp_per_row>') !== false) {
+				foreach ($output as $line) {
+					if (str_contains($line, '<pdp_per_row>')) {
 						/**
 						 * <pdp_per_row>24</pdp_per_row> <!-- 7200 seconds -->
 						 * split the database record into pieces
@@ -363,22 +384,22 @@ function float_rrdfile($rrd_path, $local_data_id, $step, $start_time, $end_time)
 						 * We use this just in case we need to update
 						 * only one line in the RRA.
 						 */
-						$granularity = $parts[2];
+						$granularity = (float) $parts[2];
 						$gdelta      = $granularity / 2;
 						$curstep     = $granularity;
 
 						$line .= PHP_EOL;
-					} elseif (strpos($line, '<database>') !== false) {
+					} elseif (str_contains($line, '<database>')) {
 						$in_database = true;
 						$line .= PHP_EOL;
-					} elseif (strpos($line, '</database>') !== false) {
+					} elseif (str_contains($line, '</database>')) {
 						$in_database = false;
 						$line .= PHP_EOL;
 					} elseif ($in_database) {
-						/* split the database record into pieces */
+						// split the database record into pieces
 						$parts  = preg_split('/[\s]+/', trim($line));
 
-						$timestamp = $parts[5];
+						$timestamp = intval($parts[5]);
 
 						if ($timestamp <= $start_time && ($timestamp + $gdelta) < $end_time) {
 							$in_range = false;
@@ -392,9 +413,9 @@ function float_rrdfile($rrd_path, $local_data_id, $step, $start_time, $end_time)
 						} elseif ($prev_data != '') {
 							if ($seebug) {
 								if ($step !== false) {
-									fwrite($lf, sprintf("In Range: CurDate:%s, StartDate:%s, EndDate:%s, Granularity:%s, Delta:%s, Step:%s" . PHP_EOL, date('Y-m-d H:i:s', $timestamp), date('Y-m-d H:i:s', $start_time), date('Y-m-d H:i:s', $end_time), $granularity, $delta_time, $step));
+									fwrite($lf, sprintf('In Range: CurDate:%s, StartDate:%s, EndDate:%s, Granularity:%s, Delta:%s, Step:%s' . PHP_EOL, date('Y-m-d H:i:s', $timestamp), date('Y-m-d H:i:s', $start_time), date('Y-m-d H:i:s', $end_time), $granularity, $delta_time, $step));
 								} else {
-									fwrite($lf, sprintf("In Range: CurDate:%s, StartDate:%s, EndDate:%s, Granularity:%s, Delta:%s" . PHP_EOL, date('Y-m-d H:i:s', $timestamp), date('Y-m-d H:i:s', $start_time), date('Y-m-d H:i:s', $end_time), $granularity, $delta_time));
+									fwrite($lf, sprintf('In Range: CurDate:%s, StartDate:%s, EndDate:%s, Granularity:%s, Delta:%s' . PHP_EOL, date('Y-m-d H:i:s', $timestamp), date('Y-m-d H:i:s', $start_time), date('Y-m-d H:i:s', $end_time), $granularity, $delta_time));
 								}
 							}
 
@@ -403,17 +424,17 @@ function float_rrdfile($rrd_path, $local_data_id, $step, $start_time, $end_time)
 
 								unset($parts[7]);
 
-								$nline = $db_prefix . implode(' ', $parts) . ' ' .  $prev_data . PHP_EOL;
+								$nline = $db_prefix . implode(' ', $parts) . ' ' . $prev_data . PHP_EOL;
 
 								if ($seebug) {
-									fwrite($lf, sprintf("Pruning: CurDate:%s, StartDate:%s, EndDate:%s, Granularity:%s, Delta:%s" . PHP_EOL, date('Y-m-d H:i:s', $timestamp), date('Y-m-d H:i:s', $start_time), date('Y-m-d H:i:s', $end_time), $granularity, $delta_time));
+									fwrite($lf, sprintf('Pruning: CurDate:%s, StartDate:%s, EndDate:%s, Granularity:%s, Delta:%s' . PHP_EOL, date('Y-m-d H:i:s', $timestamp), date('Y-m-d H:i:s', $start_time), date('Y-m-d H:i:s', $end_time), $granularity, $delta_time));
 									fwrite($lf, sprintf("PreLine: %s\nOldLine: %s\nNewLine: %s\n\n", trim($prev_line), trim($line), trim($nline)));
 								}
 
 								$line = $nline;
 							} else {
 								if ($seebug) {
-									fwrite($lf, sprintf("Not Pruning: CurDate:%s, StartDate:%s, EndDate:%s, Granularity:%s, Delta:%s" . PHP_EOL, date('Y-m-d H:i:s', $timestamp), date('Y-m-d H:i:s', $start_time), date('Y-m-d H:i:s', $end_time), $granularity, $delta_time));
+									fwrite($lf, sprintf('Not Pruning: CurDate:%s, StartDate:%s, EndDate:%s, Granularity:%s, Delta:%s' . PHP_EOL, date('Y-m-d H:i:s', $timestamp), date('Y-m-d H:i:s', $start_time), date('Y-m-d H:i:s', $end_time), $granularity, $delta_time));
 									fwrite($lf, sprintf("PreLine: %s\nOldLine: %s\n\n", trim($prev_line), trim($line)));
 								}
 
@@ -435,43 +456,52 @@ function float_rrdfile($rrd_path, $local_data_id, $step, $start_time, $end_time)
 
 				fclose($fp);
 
-				/* restore the file */
+				// restore the file
 				$return  = 0;
-				$output  = array();
+				$output  = [];
 				$command = "$rrdtool_bin restore -f $tmp_file $rrd_path";
 
 				$response = exec($command, $output, $return);
 
+				if (!$seebug && file_exists($tmp_file)) {
+					unlink($tmp_file);
+				}
+
+				if ($seebug) {
+					fclose($lf);
+				}
+
 				if ($return == 0) {
 					cacti_log(sprintf('NOTE: Range floated for RRDfile %s', $rrd_path), false, 'RFLOAT');
+
 					return true;
 				} else {
 					cacti_log(sprintf('WARNING: Range float FAILED for RRDfile %s.  Message is %s', $rrd_path, $response), false, 'RFLOAT');
-					return false;
-				}
 
-				if (!$seebug) {
-					unlink($tmp_file);
-					fclose($lf);
+					return false;
 				}
 			} else {
 				cacti_log(sprintf('WARNING: Unable to open file %s for writing', $tmp_file), false, 'RFLOAT');
+
 				return false;
 			}
 		} else {
 			cacti_log(sprintf('WARNING: Unable to write to RRDfile %s', $rrd_path), false, 'RFLOAT');
+
 			return false;
 		}
 	} else {
 		cacti_log(sprintf('WARNING: RRDfile does not exist %s', $rrd_path), false, 'RFLOAT');
+
 		return false;
 	}
 }
 
-function float_master_handler($forcerun, $resume, $host_id, $host_template_id, $graph_template_id, $local_graph_ids, $threads, $step, $start_time, $end_time) {
+function float_master_handler(bool $forcerun, bool $resume, int $host_id, int $host_template_id, int $graph_template_id,
+	array $local_graph_ids, int $threads, mixed $step, int $start_time, int $end_time) : bool {
 	global $type;
 
-	/* Create table if first time use */
+	// Create table if first time use
 	if (!db_table_exists('poller_float_rrdfiles_not_done')) {
 		db_execute("CREATE TABLE `poller_float_rrdfiles_not_done` (
 			`process` int(10) unsigned NOT NULL DEFAULT 0,
@@ -485,43 +515,44 @@ function float_master_handler($forcerun, $resume, $host_id, $host_template_id, $
 	}
 
 	$sql_where  = '';
-	$sql_params = array();
+	$sql_params = [];
 
-	if ($host_id !== false) {
-		$sql_where  .= 'WHERE h.id = ?';
+	if ($host_id > 0) {
+		$sql_where .= 'WHERE h.id = ?';
 		$sql_params[] = $host_id;
 	}
 
-	if ($host_template_id !== false) {
-		$sql_where  .= ($sql_where != '' ? 'AND ':'WHERE ') . 'h.host_template_id = ?';
+	if ($host_template_id > 0) {
+		$sql_where .= ($sql_where != '' ? 'AND ' : 'WHERE ') . 'h.host_template_id = ?';
 		$sql_params[] = $host_template_id;
 	}
 
-	if ($graph_template_id !== false) {
-		$sql_where  .= ($sql_where != '' ? 'AND ':'WHERE ') . 'gti.graph_template_id = ?';
+	if ($graph_template_id > 0) {
+		$sql_where .= ($sql_where != '' ? 'AND ' : 'WHERE ') . 'gti.graph_template_id = ?';
 		$sql_params[] = $graph_template_id;
 	}
 
 	if (cacti_sizeof($local_graph_ids)) {
-		$sql_where  .= ($sql_where != '' ? 'AND ':'WHERE ') . '(';
+		$sql_where .= ($sql_where != '' ? 'AND ' : 'WHERE ') . '(';
 		$inner_where = '';
 
-		foreach($local_graph_ids as $id) {
-			$inner_where .= ($inner_where != '' ? ' OR ':'') . 'gti.local_graph_id = ' . $id;
+		foreach ($local_graph_ids as $id) {
+			$inner_where .= ($inner_where != '' ? ' OR ' : '') . 'gti.local_graph_id = ' . $id;
 		}
 
 		$sql_where .= $inner_where . ')';
 	}
 
-	/* Find out if there are unprocessed records */
+	// Find out if there are unprocessed records
 	if ($resume) {
 		$rows = db_fetch_cell('SELECT COUNT(*) FROM poller_float_rrdfiles_not_done');
 
-		/* If there are no unprocessed records, prime the collector */
+		// If there are no unprocessed records, prime the collector
 		if ($rows > 0) {
 			db_execute('UPDATE poller_float_rrdfiles_not_done SET process = 0');
 		} else {
 			printf('ERROR: There are no outstanding RRDfiles to process!');
+
 			return false;
 		}
 	} else {
@@ -545,20 +576,21 @@ function float_master_handler($forcerun, $resume, $host_id, $host_template_id, $
 	}
 
 	if ($rows == 0) {
-		print "WARNING: There are no RRDfiles to process";
+		print 'WARNING: There are no RRDfiles to process';
+
 		return false;
 	}
 
-	$rrdfiles_per_process = ceil(db_fetch_cell_prepared('SELECT COUNT(*)/? FROM poller_float_rrdfiles_not_done', array($threads)));
+	$rrdfiles_per_process = ceil(db_fetch_cell_prepared('SELECT COUNT(*)/? FROM poller_float_rrdfiles_not_done', [$threads]));
 
 	print "There are $threads and $rrdfiles_per_process RRDfiles to process per thread" . PHP_EOL;
 
-	for($thread_id = 1; $thread_id <= $threads; $thread_id++) {
+	for ($thread_id = 1; $thread_id <= $threads; $thread_id++) {
 		db_execute_prepared("UPDATE poller_float_rrdfiles_not_done
 			SET process = ?
 			WHERE process = 0
 			LIMIT $rrdfiles_per_process",
-			array($thread_id));
+			[$thread_id]);
 
 		float_debug("Launching Process ID $thread_id");
 
@@ -589,17 +621,18 @@ function float_master_handler($forcerun, $resume, $host_id, $host_template_id, $
 }
 
 /**
- * flaot_launch_child - this function will launch collector children based upon
- *   the maximum number of threads and the process type
+ * float_launch_child - this function will launch collector children based upon
+ * the maximum number of threads and the process type
  *
- * @param $thread_id  (int)    The Thread id to launch
- * @param $start_time (int)    The float window start time as a timestamp
- * @param $end_time   (int)    The float window end time as a timestamp
+ * @param int   $thread_id  The Thread id to launch
+ * @param mixed $step       The RRDstep for the RRDfile
+ * @param int   $start_time The float window start time as a timestamp
+ * @param int   $end_time   The float window end time as a timestamp
  *
- * @return - NULL
+ * @return void
  */
-function float_launch_child($thread_id, $step, $start_time, $end_time) {
-	global $config, $seebug;
+function float_launch_child(int $thread_id, mixed $step, int $start_time, int $end_time) : void {
+	global $seebug;
 
 	$php_binary = read_config_option('path_php_binary');
 
@@ -607,37 +640,33 @@ function float_launch_child($thread_id, $step, $start_time, $end_time) {
 
 	cacti_log(sprintf('NOTE: Launching Float Data Number %s for Type %s', $thread_id, 'child'), false, 'RFLOAT', POLLER_VERBOSITY_MEDIUM);
 
-	exec_background($php_binary, $config['base_path'] . "/cli/float_rrdfiles.php --type=child --child=$thread_id --start=$start_time --end=$end_time" . ($step !== false ? ' --step=' . $step:'') . ($seebug ? ' --debug':''));
+	exec_background($php_binary, CACTI_PATH_CLI . "/float_rrdfiles.php --type=child --child=$thread_id --start=$start_time --end=$end_time" . ($step !== false ? ' --step=' . $step : '') . ($seebug ? ' --debug' : ''));
 }
 
 /**
  * float_processes_running - given a type, determine the number
- *   of sub-type or children that are currently running
+ * of sub-type or children that are currently running
  *
- * @return - (int) The number of running processes
+ * @return int - The number of running processes
  */
-function float_processes_running() {
+function float_processes_running() : int {
 	$running = db_fetch_cell('SELECT COUNT(*)
 		FROM processes
 		WHERE tasktype = "rfloat"
 		AND taskname = "child"');
 
-	if ($running == 0) {
-		return 0;
-	}
-
-	return $running;
+	return intval($running);
 }
 
 /**
  * float_debug - this simple routine prints a standard message to the console
- *   when running in debug mode.
+ * when running in debug mode.
  *
- * @param $message - (string) The message to display
+ * @param string $message The message to display
  *
- * @return - NULL
+ * @return void
  */
-function float_debug($message) {
+function float_debug(string $message) : void {
 	global $seebug;
 
 	if ($seebug) {
@@ -646,25 +675,85 @@ function float_debug($message) {
 }
 
 /**
- * display_version - displays version information
+ * sig_handler - provides a generic means to catch exceptions to the Cacti log.
+ *
+ * @param int $signo The signal that was thrown by the interface.
+ *
+ * @return void
  */
-function display_version() {
+function sig_handler(int $signo) : void {
+	global $type, $thread_id;
+
+	switch ($signo) {
+		case SIGTERM:
+		case SIGINT:
+			cacti_log('WARNING: RRDfile Data Float Tool terminated by user', false, 'RFLOAT');
+
+			if (str_contains($type, 'rmaster')) {
+				float_kill_running_processes();
+			}
+
+			unregister_process('rfloat', 'rmaster', $thread_id, getmypid());
+
+			exit(1);
+		default:
+			// ignore all other signals
+	}
+}
+
+/**
+ * float_kill_running_processes - this function is part of an interrupt
+ * handler to kill children processes when the parent is killed
+ *
+ * @return void
+ */
+function float_kill_running_processes() : void {
+	global $type;
+
+	$processes = db_fetch_assoc_prepared('SELECT *
+		FROM processes
+		WHERE tasktype = "rfloat"
+		AND taskname IN ("child")
+		AND pid != ?',
+		[getmypid()]);
+
+	if (cacti_sizeof($processes)) {
+		foreach ($processes as $p) {
+			cacti_log(sprintf('WARNING: Killing Cleanup %s PID %d due to another due to signal or overrun.', ucfirst($p['taskname']), $p['pid']), false, 'RFLOAT');
+			posix_kill($p['pid'], SIGTERM);
+
+			unregister_process($p['tasktype'], $p['taskname'], $p['taskid'], $p['pid']);
+		}
+	}
+}
+
+/**
+ * display_version - displays version information
+ *
+ * @return void
+ */
+function display_version() : void {
 	$version = get_cacti_version();
 	print "Cacti RRDfile Data Float Tool, Version $version " . COPYRIGHT_YEARS . PHP_EOL;
 }
 
 /**
  * display_help - generic help screen for utilities
+ *
+ * @return void
  */
-function display_help () {
+function display_help() : void {
 	display_version();
 
 	print PHP_EOL . 'usage: float_rrdfiles.php --start=TS --end=TS [--threads=N --host-id=N --host-template-id=N --graph-template-id=N] [--debug]' . PHP_EOL . PHP_EOL;
 
 	print 'Cacti\'s RRDfile Data Float Tool.  This CLI script will float a' . PHP_EOL;
 	print 'range in select Cacti Graphs using the RRDtool dump/import utility.' . PHP_EOL . PHP_EOL;
-	print 'This utility will run in parallel with the given number of threads,' . PHP_EOL;
-	print 'except in the case when you have specified specific --graph-ids as' . PHP_EOL;
+
+	print 'This utility will run in parallel with the given number of threads.' . PHP_EOL;
+	print 'If threads argument is not specified, value is derived from the number of processor cores.' . PHP_EOL;
+	print 'In case of a detection problem, 2 threads are used.' . PHP_EOL;
+	print 'Except in the case when you have specified specific --graph-ids as' . PHP_EOL;
 	print 'show with the optional settings below.' . PHP_EOL . PHP_EOL;
 
 	print 'Required:' . PHP_EOL;
@@ -672,9 +761,9 @@ function display_help () {
 	print '    --end=TS    - The float range end time timestamp or date.' . PHP_EOL . PHP_EOL;
 
 	print 'Optional:' . PHP_EOL;
-	print '    --threads             - 20, The number of threads to use to update RRDfiles' . PHP_EOL;
+	print '    --threads             - 10, The number of threads to use to update RRDfiles' . PHP_EOL;
 	print '    --resume              - False, Resume a canceled float process' . PHP_EOL;
-	print '    --host-id=N           - N/A, Update a specific devices RRDfiles' . PHP_EOL;
+	print '    --host-id=N           - N/A, Update a specific Devices RRDfiles' . PHP_EOL;
 	print '    --host-template-id=N  - N/A, Update a specific Device Templates RRDfiles' . PHP_EOL;
 	print '    --graph-template-id=N - N/A, Update a specific Graph Template RRDfiles' . PHP_EOL;
 	print '    --graph-ids=N,N,...   - N/A, A comma delimited list of graph ids to fix' . PHP_EOL;
@@ -684,58 +773,4 @@ function display_help () {
 	print 'System Controlled:' . PHP_EOL;
 	print '    --type      - The type and subtype of the float process' . PHP_EOL;
 	print '    --child     - The thread id of the child process' . PHP_EOL . PHP_EOL;
-}
-
-/**
- * sig_handler - provides a generic means to catch exceptions to the Cacti log.
- *
- * @param $signo - (int) the signal that was thrown by the interface.
- *
- * @return - null
- */
-function sig_handler($signo) {
-	global $type, $thread_id;
-
-	switch ($signo) {
-		case SIGTERM:
-		case SIGINT:
-			cacti_log('WARNING: RRDfile Data Float Tool terminated by user', false, 'RFLOAT');
-
-			if (strpos($type, 'rmaster') !== false) {
-				float_kill_running_processes();
-			}
-
-			unregister_process('rfloat', 'rmaster', $thread_id, getmypid());
-
-			exit(1);
-			break;
-		default:
-			/* ignore all other signals */
-	}
-}
-
-/**
- * float_kill_running_processes - this function is part of an interrupt
- *   handler to kill children processes when the parent is killed
- *
- * @return - NULL
- */
-function float_kill_running_processes() {
-	global $type;
-
-	$processes = db_fetch_assoc_prepared('SELECT *
-		FROM processes
-		WHERE tasktype = "rfloat"
-		AND taskname IN ("child")
-		AND pid != ?',
-		array(getmypid()));
-
-	if (cacti_sizeof($processes)) {
-		foreach($processes as $p) {
-			cacti_log(sprintf('WARNING: Killing Cleanup %s PID %d due to another due to signal or overrun.', ucfirst($p['taskname']), $p['pid']), false, 'RFLOAT');
-			posix_kill($p['pid'], SIGTERM);
-
-			unregister_process($p['tasktype'], $p['taskname'], $p['taskid'], $p['pid']);
-		}
-	}
 }

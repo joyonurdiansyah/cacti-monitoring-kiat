@@ -24,71 +24,85 @@
 */
 
 require(__DIR__ . '/../include/cli_check.php');
-require_once($config['base_path'] . '/lib/poller.php');
-require_once($config['base_path'] . '/lib/data_query.php');
-require_once($config['base_path'] . '/lib/dsstats.php');
-require_once($config['base_path'] . '/lib/dsdebug.php');
-require_once($config['base_path'] . '/lib/boost.php');
-require_once($config['base_path'] . '/lib/rrd.php');
+require_once(CACTI_PATH_LIBRARY . '/poller.php');
+require_once(CACTI_PATH_LIBRARY . '/data_query.php');
+require_once(CACTI_PATH_LIBRARY . '/dsstats.php');
+require_once(CACTI_PATH_LIBRARY . '/dsdebug.php');
+require_once(CACTI_PATH_LIBRARY . '/boost.php');
+require_once(CACTI_PATH_LIBRARY . '/rrd.php');
 
-/* process calling arguments */
+// process calling arguments
 $parms = $_SERVER['argv'];
 array_shift($parms);
 
 if (cacti_sizeof($parms)) {
-	foreach($parms as $parameter) {
-		if (strpos($parameter, '=')) {
-			list($arg, $value) = explode('=', $parameter, 2);
+	foreach ($parms as $parameter) {
+		if (str_contains($parameter, '=')) {
+			[$arg, $value] = explode('=', $parameter, 2);
 		} else {
-			$arg = $parameter;
+			$arg   = $parameter;
 			$value = '';
 		}
 
 		switch ($arg) {
-		case '--version':
-		case '-V':
-		case '-v':
-			display_version();
-			exit(0);
-		case '--help':
-		case '-H':
-		case '-h':
-			display_help();
-			exit(0);
-		default:
-			print 'ERROR: Invalid Parameter ' . $parameter . "\n\n";
-			display_help();
-			exit(1);
+			case '--version':
+			case '-V':
+			case '-v':
+				display_version();
+
+				exit(0);
+			case '--help':
+			case '-H':
+			case '-h':
+				display_help();
+
+				exit(0);
+
+			default:
+				print 'ERROR: Invalid Parameter ' . $parameter . PHP_EOL . PHP_EOL;
+				display_help();
+
+				exit(1);
 		}
 	}
 }
 
-/* record the start time */
+// record the start time
 $start = microtime(true);
 
-/* open a pipe to rrdtool for writing */
+// open a pipe to rrdtool for writing
 $rrdtool_pipe = rrd_init();
 
 $rrds_processed = 0;
 
-while (db_fetch_cell('SELECT count(*) FROM poller_output') > 0) {
-	$rrds_processed = $rrds_processed + process_poller_output($rrdtool_pipe, false);
+while (db_fetch_cell('SELECT COUNT(*) FROM poller_output') > 0) {
+	$rrds_processed = $rrds_processed + process_poller_output($rrdtool_pipe);
 }
 
-print "There were $rrds_processed RRD updates made this pass\n";
+print "There were $rrds_processed RRD updates made this pass" . PHP_EOL;
 
 rrd_close($rrdtool_pipe);
 
-/*  display_version - displays version information */
-function display_version() {
+/**
+ * display_version - displays version information
+ *
+ * @return void
+ */
+function display_version() : void {
 	$version = get_cacti_cli_version();
-	print "Cacti Process Poller Output Utility, Version $version, " . COPYRIGHT_YEARS . "\n";
+	print "Cacti Process Poller Output Utility, Version $version, " . COPYRIGHT_YEARS . PHP_EOL;
 }
 
-/*	display_help - displays the usage of the function */
-function display_help () {
+/**
+ * display_help - displays the usage of the function
+ *
+ * @return void
+ */
+function display_help() : void {
 	display_version();
 
-	print "\nusage: poller_output_empty.php\n\n";
-	print "A utility to process the poller output table.  This tool is deprecated but should work.\n\n";
+	print PHP_EOL;
+	print 'usage: poller_output_empty.php' . PHP_EOL . PHP_EOL;
+
+	print 'A utility to process the poller output table.  This tool is deprecated but should work.' . PHP_EOL;
 }

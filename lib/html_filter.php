@@ -22,85 +22,150 @@
  +-------------------------------------------------------------------------+
 */
 
-/*
- * Create a consistent responsive filter
- */
+// Create a consistent responsive filter
 
 class CactiTableFilter {
-	public $form_header    = '';
-	public $form_action    = '';
-	public $form_id        = '';
-	public $form_width     = '';
-	public $action_url     = '';
-	public $action_label   = '';
-	public $session_var    = 'sess_default';
-	private $item_rows     = array();
-	private $filter_array  = array();
-	public $default_filter = array();
+	// constructor variables
+	public string $form_header      = '';
+	public string $form_action      = '';
+	public string $form_id          = '';
+	public string $form_method      = 'get';
+	public string $session_var      = 'sess_';
+	public string $action_url       = '';
+	public string $action_label     = '';
+	public bool $show_columns       = true;
+	public array $default_filter    = [];
+	public string $rows_label       = '';
+	public string $associated_label = '';
+	public string $js_extra         = '';
+	public bool $dynamic            = true;
+	public int $def_refresh         = 300;
 
+	/**
+	 * Custom hooks for common functionality.
+	 * These hooks will reduce the number of
+	 * pages that will require a full stack replacement
+	 * filter.
+	 */
+	public bool   $has_graphs      = false;
+	public bool   $has_data        = false;
+	public bool   $has_save        = false;
+	public bool   $has_import      = false;
+	public bool   $has_export      = false;
+	public bool   $has_purge       = false;
+	public bool   $has_named       = false;
+	public bool   $has_associated  = false;
+	public bool   $has_refresh     = false;
+	public mixed  $inject_content  = false;
+	private bool  $initialized     = false;
+	private array $sort_array      = [];
+	private array $button_array    = [];
+	private array $link_array      = [];
+	private array $append_array    = [];
+	private array $item_rows       = [];
+	private array $timespans       = [];
+	private array $timeshifts      = [];
+	private array $filter_array    = [];
+	private array $frequencies     = [];
 
-	public function __construct($form_header = '', $form_action = '', $form_id = '',
-		$form_width = '', $session_var = '', $action_url = '', $action_label = '') {
-		global $item_rows;
+	public function __construct(string $form_header = '', string $form_action = '', string $form_id = '',
+		string $session_var = '', string $action_url = '', mixed $action_label = '', bool $show_columns = true) {
+		global $item_rows, $graph_timespans, $graph_timeshifts;
 
 		$this->form_header   = $form_header;
 		$this->form_action   = $form_action;
 		$this->form_id       = $form_id;
-		$this->form_width    = $form_width;
+		$this->session_var   = $session_var;
 		$this->action_url    = $action_url;
 		$this->action_label  = $action_label;
-		$this->session_var   = $session_var;
+		$this->show_columns  = $show_columns;
+
 		$this->item_rows     = $item_rows;
+		$this->timespans     = $graph_timespans;
+		$this->timeshifts    = $graph_timeshifts;
+		$this->rows_label    = __('Rows');
+
+		$this->frequencies = [
+			5   => __('%d Seconds', 5),
+			10  => __('%d Seconds', 10),
+			20  => __('%d Seconds', 20),
+			30  => __('%d Seconds', 30),
+			45  => __('%d Seconds', 45),
+			60  => __('%d Minute', 1),
+			120 => __('%d Minutes', 2),
+			300 => __('%d Minutes', 5)
+		];
+
+		if ($this->session_var == '') {
+			$action = gnrv('action');
+			$tab    = gnrv('tab');
+
+			if ($action != '') {
+				$this->session_var .= basename(get_current_page(), '.php') . '_' . $action;
+			} elseif ($tab != '') {
+				$this->session_var .= basename(get_current_page(), '.php') . '_' . $tab;
+			} else {
+				$this->session_var .= basename(get_current_page(), '.php');
+			}
+		}
 
 		if ($this->action_url != '' && $this->action_label == '') {
 			$this->action_label = __('Add');
 		}
 
-		/* default filter */
-		$this->default_filter = array(
-			'rows' => array(
-				'row1' => array(
-					'filter' => array(
+		$this->filter_array = $this->create_default();
+	}
+
+	private function create_default() : array {
+		// default filter
+		return [
+			'rows' => [
+				[
+					'filter' => [
+						'method'         => 'textbox',
 						'friendly_name'  => __('Search'),
 						'filter'         => FILTER_DEFAULT,
 						'placeholder'    => __('Enter a search term'),
 						'size'           => '30',
 						'default'        => '',
 						'pageset'        => true,
-						'max_length'     => '120'
-					),
-					'rows' => array(
-						'friendly_name' => __('Rows'),
-						'filter'        => FILTER_VALIDATE_INT,
+						'max_length'     => '120',
+						'value'          => ''
+					],
+					'rows' => [
 						'method'        => 'drop_array',
+						'friendly_name' => $this->rows_label,
+						'filter'        => FILTER_VALIDATE_INT,
 						'default'       => '-1',
 						'pageset'       => true,
-						'array'         => $this->item_rows
-					),
-					'go' => array(
-						'display' => __('Go'),
-						'title'   => __('Apply filter to table'),
-						'method'  => 'submit',
-					),
-					'clear' => array(
-						'display' => __('Clear'),
-						'title'   => __('Reset filter to default values'),
-						'method'  => 'button',
-					)
-				)
-			),
-			'sort' => array(
-				'sort_column' => 'name',
+						'array'         => $this->item_rows,
+						'value'         => '-1'
+					]
+				]
+			],
+			'buttons' => [
+				'go' => [
+					'method'  => 'submit',
+					'display' => __('Go'),
+					'title'   => __('Apply filter to table'),
+				],
+				'clear' => [
+					'method'  => 'button',
+					'display' => __('Clear'),
+					'title'   => __('Reset filter to default values'),
+				]
+			],
+			'sort' => [
+				'sort_column'    => 'name',
 				'sort_direction' => 'ASC'
-			)
-		);
+			]
+		];
 	}
 
 	public function __destruct() {
-		return true;
 	}
 
-	public function set_filter_row($array, $index = false) {
+	public function set_filter_row(array $array, bool $index = false) : void {
 		if ($index === false) {
 			$this->filter_array['rows'][] = $array;
 		} else {
@@ -108,225 +173,797 @@ class CactiTableFilter {
 		}
 	}
 
-	public function get_filter_row($index) {
-		if ($index === false ) {
+	public function get_filter_row(string $index) : bool {
+		if ($index === false) {
 			return false;
-		} elseif (array_key_exists($index, $this->filter_array['rows'])) {
+		}
+
+		if (array_key_exists($index, $this->filter_array['rows'])) {
 			return $this->filter_array['rows'][$index];
 		} else {
 			return false;
 		}
 	}
 
-	public function set_filter_array($array) {
+	public function set_filter_array(array $array) : void {
 		$this->filter_array = $array;
 	}
 
-	public function get_filter() {
+	public function get_filter() : array {
 		return $this->filter_array;
 	}
 
-	public function set_sort_array($sort_column, $sort_direction) {
-		$this->filter_array['sort'] = array(
-			'sort_column' => $sort_column,
+	public function set_sort_array(string $sort_column, string $sort_direction) : void {
+		$this->sort_array = [
+			'sort_column'    => $sort_column,
 			'sort_direction' => $sort_direction
-		);
+		];
 	}
 
-	public function filter_render() {
-		/* setup filter variables */
+	public function add_button(string $id, array $button) : void {
+		$this->button_array[$id] = $button;
+	}
+
+	public function add_link(string $id, string $link) : void {
+		$this->link_array[$id] = $link;
+	}
+
+	public function add_row_element(int $row, string $id, array $filter) : void {
+		$this->append_array[$row][$id] = $filter;
+	}
+
+	public function render() : bool {
+		if (!$this->initialized) {
+			$this->initialize_filter();
+		}
+
+		// validate filter variables
 		$this->sanitize_filter_variables();
 
-		/* render the filter in the page */
-		$this->create_filter();
+		// create the filter for the page
+		$filter = $this->create_filter();
 
-		/* create javascript to operate of the filter */
-		$this->create_javascript();
+		// if validation succeeds, print output the data
+		print $filter;
+
+		// create javascript to operate of the filter
+		print $this->create_javascript();
 
 		return true;
 	}
 
-	private function create_filter() {
-		if (!cacti_sizeof($this->filter_array)) {
-			$this->filter_array = $this->default_filter;
+	public function sanitize() : void {
+		if (!$this->initialized) {
+			$this->initialize_filter();
 		}
 
-		html_start_box($this->form_header, $this->form_width, true, '3', 'center', $this->action_url, $this->action_label);
+		// validate filter variables
+		$this->sanitize_filter_variables();
+	}
+
+	private function initialize_filter() : void {
+		if (!cacti_sizeof($this->filter_array)) {
+			$this->filter_array = $this->create_default();
+		}
+
+		if (cacti_sizeof($this->sort_array)) {
+			$this->filter_array['sort'] = $this->sort_array;
+		}
+
+		if (cacti_sizeof($this->button_array)) {
+			if (cacti_sizeof($this->filter_array['buttons'])) {
+				$this->filter_array['buttons'] += $this->button_array;
+			} else {
+				$this->filter_array['buttons']  = $this->button_array;
+			}
+		}
+
+		if (cacti_sizeof($this->link_array)) {
+			if (cacti_sizeof($this->filter_array['links'])) {
+				$this->filter_array['links'] += $this->link_array;
+			} else {
+				$this->filter_array['links']  = $this->link_array;
+			}
+		}
+
+		if (cacti_sizeof($this->append_array)) {
+			foreach ($this->append_array as $row => $data) {
+				foreach ($data as $id => $filter) {
+					$this->filter_array['rows'][$row][$id] = $filter;
+				}
+			}
+		}
+
+		// Make common adjustments
+		if ($this->has_refresh) {
+			if (isrv('refresh')) {
+				$value = gnrv('refresh');
+			} else {
+				$value = $this->def_refresh;
+			}
+
+			$this->filter_array['rows'][0] += [
+				'refresh' => [
+					'method'        => 'drop_array',
+					'friendly_name' => __('Refresh'),
+					'filter'        => FILTER_VALIDATE_INT,
+					'default'       => $this->def_refresh,
+					'array'         => $this->frequencies,
+					'value'         => $value
+				]
+			];
+		}
+
+		if ($this->has_graphs) {
+			if (isrv('has_graphs')) {
+				$value = gnrv('has_graphs');
+			} else {
+				$value = read_config_option('default_has') == 'on' ? 'true' : 'false';
+			}
+
+			$this->filter_array['rows'][0] += [
+				'has_graphs' => [
+					'method'         => 'filter_checkbox',
+					'friendly_name'  => __('Has Graphs'),
+					'filter'         => FILTER_VALIDATE_REGEXP,
+					'filter_options' => ['options' => ['regexp' => '(true|false)']],
+					'default'        => read_config_option('default_has') == 'on' ? 'true' : 'false',
+					'pageset'        => true,
+					'value'          => $value
+				]
+			];
+		}
+
+		if ($this->has_data) {
+			if (isrv('has_data')) {
+				$value = gnrv('has_data');
+			} else {
+				$value = read_config_option('default_has') == 'on' ? 'true' : 'false';
+			}
+
+			$this->filter_array['rows'][0] += [
+				'has_data' => [
+					'method'         => 'filter_checkbox',
+					'friendly_name'  => __('Has Data Sources'),
+					'filter'         => FILTER_VALIDATE_REGEXP,
+					'filter_options' => ['options' => ['regexp' => '(true|false)']],
+					'default'        => read_config_option('default_has') == 'on' ? 'true' : 'false',
+					'pageset'        => true,
+					'value'          => $value
+				]
+			];
+		}
+
+		if ($this->has_named) {
+			if (isrv('named')) {
+				$value = gnrv('named');
+			} else {
+				$value = read_config_option('default_has') == 'on' ? 'true' : 'false';
+			}
+
+			$this->filter_array['rows'][0] += [
+				'named' => [
+					'method'         => 'filter_checkbox',
+					'friendly_name'  => __('Named Colors'),
+					'filter'         => FILTER_VALIDATE_REGEXP,
+					'filter_options' => ['options' => ['regexp' => '(true|false)']],
+					'default'        => read_config_option('default_has') == 'on' ? 'true' : 'false',
+					'pageset'        => true,
+					'value'          => $value
+				]
+			];
+		}
+
+		if ($this->has_associated) {
+			if (isrv('associated')) {
+				$value = gnrv('associated');
+			} else {
+				$value = read_config_option('default_has') == 'on' ? 'true' : 'false';
+			}
+
+			$this->filter_array['rows'][0] += [
+				'associated' => [
+					'method'         => 'filter_checkbox',
+					'friendly_name'  => ($this->associated_label != '' ? $this->associated_label : __('Associated')),
+					'filter'         => FILTER_VALIDATE_REGEXP,
+					'filter_options' => ['options' => ['regexp' => '(true|false)']],
+					'default'        => read_config_option('default_has') == 'on' ? 'true' : 'false',
+					'pageset'        => true,
+					'value'          => $value
+				]
+			];
+		}
+
+		if ($this->has_save) {
+			$this->filter_array['buttons']['save'] = [
+				'method'  => 'button',
+				'display' => __('Save'),
+				'title'   => __('Save Filter Defaults'),
+				'status'  => __('Saving Filter')
+			];
+		}
+
+		if ($this->has_import) {
+			$this->filter_array['buttons']['import'] = [
+				'method'  => 'button',
+				'display' => __('Import'),
+				'title'   => __('Import Data'),
+			];
+		}
+
+		if ($this->has_export) {
+			$this->filter_array['buttons']['export'] = [
+				'method'   => 'button',
+				'display'  => __('Export'),
+				'title'    => __('Export Data'),
+				'callback' => 'document.location = \'' . get_current_page() . '?action=export\'',
+			];
+		}
+
+		if ($this->has_purge) {
+			$this->filter_array['buttons']['purge'] = [
+				'method'  => 'button',
+				'display' => __('Purge'),
+				'title'   => __('Purge Data'),
+				'status'  => __('Purging Data')
+			];
+		}
+
+		if (isset($this->filter_array['buttons']) && cacti_sizeof($this->filter_array['buttons'])) {
+			$this->filter_array['rows'][0] += $this->filter_array['buttons'];
+		}
+
+		$this->initialized = true;
+	}
+
+	private function create_filter() : string {
+		// Buffer output
+		ob_start();
+
+		$text_appended = false;
+
+		if (isset($this->filter_array['links']) && cacti_sizeof($this->filter_array['links'])) {
+			$linkButtons = [];
+
+			if ($this->action_url != '') {
+				$linkButtons[] = [
+					'id'       => 'add',
+					'href'     => $this->action_url,
+					'title'    => $this->action_label,
+					'callback' => true,
+					'class'    => 'ti ti-plus plusAdd'
+				];
+			}
+
+			foreach ($this->filter_array['links'] as $index => $link) {
+				$linkButtons[] = [
+					'id'       => 'dynamic' . $index,
+					'href'     => $link['url'],
+					'title'    => $link['display'],
+					'callback' => true,
+					'class'    => $link['class']
+				];
+			}
+
+			html_filter_start_box($this->form_header, $linkButtons, true, $this->show_columns, $this->action_label);
+		} else {
+			html_filter_start_box($this->form_header, $this->action_url, true, $this->show_columns, $this->action_label);
+		}
 
 		if (isset($this->filter_array['rows'])) {
-			print "<form id='" . html_escape($this->form_id) . "' action='" . html_escape($this->form_action) . "'>\n";
+			print "<form id='" . $this->form_id . "' action='" . $this->form_action . "' method='" . $this->form_method . "' class='cactiFilter'>";
 
-			foreach($this->filter_array['rows'] as $index => $row) {
-				print "<div class='filterTable'>\n";
-				print "<div class='formRow'>\n";
+			foreach ($this->filter_array['rows'] as $index => $row) {
+				if ($index > 0 && !$text_appended) {
+					print "<div class='filterColumnButton' id='text'></div>";
+					$text_appended = true;
+				}
 
-				foreach($row as $field_name => $field_array) {
+				print "<div class='filterTable even'>";
+				print "<div class='filterRow'>";
+
+				foreach ($row as $field_name => $field_array) {
+					if (isset($field_array['class'])) {
+						$class = ' ' . $field_array['class'];
+					} else {
+						$class = '';
+					}
+
+					if (!isset($field_array['value']) &&
+						$field_array['method'] != 'validate' &&
+						$field_array['method'] != 'submit' &&
+						$field_array['method'] != 'content' &&
+						$field_array['method'] != 'button' &&
+						$field_array['method'] != 'timespan') {
+						cacti_log("WARNING: The Filter Class value field $field_name is missing");
+
+						$field_array['value'] = '';
+					}
+
 					switch($field_array['method']) {
-					case 'button':
-						print "<div class='formColumnButton'>\n";
-						print "<input type='button' class='ui-button ui-corner-all ui-widget' id='" . $field_name . "' value='" . html_escape_request_var($field_name) . "'" . (isset($field_array->title) ? " title='" . html_escape($field_array->title, ENT_QUOTES, 'UTF-8'):'') . "'>";
-						print "</div>\n";
+						case 'content':
+							print '<div class="filterColumn">' . $field_array['content'] . '</div>';
 
-						break;
-					case 'submit':
-						print "<div class='formColumnButton'>\n";
-						print "<input type='submit' class='ui-button ui-corner-all ui-widget' id='" . $field_name . "' value='" . html_escape_request_var($field_name) . "'" . (isset($field_array->title) ? " title='" . html_escape($field_array->title):'') . "'>";
-						print "</div>\n";
+							break;
+						case 'validate':
+							// Just for validating other request variables
 
-						break;
-					case 'timespan':
-						print "<div class='formColumn'><div class='formFieldName'>" . __('Presets') . "</div></div>\n";
+							break;
+						case 'button':
+							print '<div class="filterColumnButton">' . PHP_EOL;
 
-						break;
-					default:
-						if (isset($field_array['friendly_name'])) {
-							print "<div class='formColumn'><div class='formFieldName'>" . $field_array['friendly_name'] . "</div></div>\n";
-						}
+							if (isset($field_array['display'])) {
+								print '<button type="button" class="ui-button ui-corner-all ui-widget" id="' . $field_name . '"' . (isset($field_array['title']) ? ' title="' . $field_array['title'] : '') . '"><span class="button-text">' . $field_array['display'] . '</span></button>';
+							} else {
+								print '<button type="button" class="ui-button ui-corner-all ui-widget" id="' . $field_name . '"' . (isset($field_array['title']) ? ' title="' . $field_array['title'] : '') . '"><i class="' . $field_array['class'] . '"></i></button>';
+							}
 
-						print "<div class='formColumn'>\n";
+							print '</div>' . PHP_EOL;
 
-						draw_edit_control($field_name, $field_array);
+							break;
+						case 'submit':
+							print '<div class="filterColumnButton">' . PHP_EOL;
+							print '<button type="submit" class="ui-button ui-corner-all ui-widget ui-state-active ' . $class . '" id="' . $field_name . '" ' . (isset($field_array['title']) ? ' title="' . $field_array['title'] : '') . '"><span class="button-text">' . $field_array['display'] . '</span></button>';
+							print '</div>' . PHP_EOL;
 
-						print "</div>\n";
+							break;
+						case 'filter_checkbox':
+							print '<div class="filterColumn"><span>' . PHP_EOL;
+							print '<input type="checkbox" class="ui-button ui-corner-all ui-widget' . $class . '" id="' . $field_name . '"' . (isset($field_array['title']) ? ' title="' . $field_array['title'] : '') . '"' . ($field_array['value'] == 'on' || $field_array['value'] == 'true' ? ' checked' : '') . '>';
+							print '&nbsp;<label for="' . $field_name . '">' . $field_array['friendly_name'] . '</label>';
+							print '</span></div>' . PHP_EOL;
+
+							break;
+						case 'timespan':
+							print '<div class="filterColumn"><div class="filterFieldName">' . __('Presets') . '</div></div>' . PHP_EOL;
+
+							print '<div class="filterColumn">';
+							print '<select id="predefined_timespan" class="' . $class . '">';
+
+							$this->timespans = array_merge([GT_CUSTOM => __('Custom')], $this->timespans);
+
+							$start_val = 0;
+							$end_val   = cacti_sizeof($this->timespans);
+
+							if (cacti_sizeof($this->timespans)) {
+								foreach ($this->timespans as $value => $text) {
+									print "<option value='$value'" . ($_SESSION['sess_current_timespan'] == $value ? ' selected' : '') . '>' . htmle($text) . '</option>';
+								}
+							}
+							print '</select>';
+							print '</div>';
+
+							// From data
+							print '<div class="filterColumn">';
+							print __('From');
+							print '</div>';
+							print '<div class="filterColumn">';
+							print '<span>';
+							print '<input type="text" class="ui-state-default ui-corner-all' . $class . '" id="date1" size="18" value="' . ($_SESSION['sess_current_date1'] ?? '') . '">';
+							print '<i id="startDate" class="calendar ti ti-calendar-clock" title="' . __esc('Start Date Selector') . '"></i>';
+							print '</span>';
+							print '</div>';
+
+							// To Data
+							print '<div class="filterColumn">';
+							print __('From');
+							print '</div>';
+							print '<div class="filterColumn">';
+							print '<span>';
+							print '<input type="text" class="ui-state-default ui-corner-all' . $class . '" id="date2" size="18" value="' . ($_SESSION['sess_current_date2'] ?? '') . '">';
+							print '<i id="endDate" class="calendar ti ti-calendar-clock" title="' . __esc('End Date Selector') . '"></i>';
+							print '</span>';
+							print '</div>';
+
+							if (isset($field_array['shifter']) && $field_array['shifter'] === true) {
+								print '<div class="filterColumn">';
+								print '<span>';
+
+								print '<i id="shift_left" class="shiftArrow ti ti-player-track-prev" title="' . __esc('Shift Time Backward') . '"></i>';
+								print '<select id="predefined_timeshift" title="' . __esc('Define Shifting Interval') . '" class="' . $class . '">';
+
+								$start_val  = 1;
+								$end_val    = cacti_sizeof($this->timeshifts) + 1;
+
+								if (cacti_sizeof($this->timeshifts)) {
+									for ($shift_value = $start_val; $shift_value < $end_val; $shift_value++) {
+										print "<option value='$shift_value'" . ($_SESSION['sess_current_timeshift'] == $shift_value ? ' selected' : '') . '>' . htmle($this->timeshifts[$shift_value]) . '</option>';
+									}
+								}
+
+								print '</select>';
+								print '<i id="shift_right" class="shiftArrow ti ti-player-track-next" title="' . __esc('Shift Time Forward') . '"></i>';
+
+								print '</span>';
+								print '</div>';
+							}
+
+							if ((isset($field_array['refresh']) && $field_array['refresh'] === true) || (isset($field_array['clear']) && $field_array['clear'] === true)) {
+								print '<div class="filterColumn">';
+								print '<span>';
+
+								if (isset($field_array['refresh'])) {
+									print '<button type="button" class="ui-button ui-corner-all ui-widget" id="tsrefresh"' . ' title="' . __esc('Refresh Selected Timespan') . '"><span class="button-text">' . __esc('Refresh') . '</span></button>';
+								}
+
+								if (isset($field_array['clear'])) {
+									print '<button type="button" class="ui-button ui-corner-all ui-widget" id="tsclear"' . ' title="' . __esc('Clear Selected Timespan') . '"><span class="button-text">' . __esc('Clear') . '</span></span></button>';
+								}
+
+								print '</span>';
+								print '</div>';
+							}
+
+							break;
+						case 'hidden':
+							print '<div class="filterColumn" style="display:none">' . PHP_EOL;
+
+							draw_edit_control($field_name, $field_array);
+
+							print '</div>' . PHP_EOL;
+
+							break;
+						default:
+							if (isset($field_array['friendly_name'])) {
+								print '<div class="filterColumn"><div class="filterFieldName"><label for="' . $field_name . '">' . $field_array['friendly_name'] . '</label></div></div>' . PHP_EOL;
+							}
+
+							if (isrv($field_name) && !str_contains($field_array['method'], 'callback')) {
+								$field_array['value'] = gnrv($field_name);
+							}
+
+							print '<div class="filterColumn">' . PHP_EOL;
+
+							draw_edit_control($field_name, $field_array);
+
+							print '</div>' . PHP_EOL;
 					}
 				}
 
-				print "</div>\n";
-				print "</div>\n";
+				if ($index == 0) {
+					print "<div class='filterColumnButton' id='text'></div>";
+				}
+
+				print '</div>' . PHP_EOL;
+				print '</div>' . PHP_EOL;
 			}
 
-			print "</form>\n";
+			if ($this->inject_content !== false) {
+				print $this->inject_content;
+			}
+
+			print '</form>' . PHP_EOL;
 		}
 
-		html_end_box(true, true);
+		html_filter_end_box();
+
+		return ob_get_clean();
 	}
 
-	private function create_javascript() {
-		$applyFilter = '"' . $this->form_action;
-		$clearFilter = $applyFilter;
+	private function make_function(string $buttonId, array $buttonArray, string $buttonAction) : string {
+		$func_nl        = "\n\t\t\t";
+		$func_el        = "\n\t\t";
+		$buttonFunction = '';
 
-		if (strpos('?', $applyFilter) === false) {
+		if (isset($buttonArray['url'])) {
+			if (!isset($buttonArray['status'])) {
+				$buttonFunction .= PHP_EOL . "\t\tfunction {$buttonId}Function () {" . $func_nl .
+					'clearTimeout(myRefresh);' . $func_nl .
+					"loadUrl({ url: '{$buttonArray['url']}' });" . $func_el .
+				'};' . PHP_EOL;
+			} else {
+				$buttonFunction .= PHP_EOL . "\t\tfunction {$buttonId}Function () {" . $func_nl .
+					'clearTimeout(myRefresh);' . $func_nl .
+					"$('#text').text('{$buttonArray['status']}');" . $func_nl .
+					"pulsate('#text');" . $func_nl .
+					"loadUrl({ url: '{$buttonArray['url']}', funcEnd: 'finishFinalize' });" . $func_el .
+				'};' . PHP_EOL;
+			}
+		} else {
+			if (!isset($buttonArray['status'])) {
+				if (isset($buttonArray['callback'])) {
+					$callbackFunction = $buttonArray['callback'];
+				} else {
+					$callbackFunction = "loadUrl({ url: $buttonAction })";
+				}
+
+				$buttonFunction .= PHP_EOL . "\t\tfunction {$buttonId}Function () {" . $func_nl .
+					'clearTimeout(myRefresh);' . $func_nl .
+					$callbackFunction . ';' . $func_el .
+					'Pace.stop();' . $func_el .
+				'};' . PHP_EOL;
+			} else {
+				if (isset($buttonArray['callback'])) {
+					$callbackFunction = $buttonArray['callback'];
+				} else {
+					$callbackFunction = "loadUrl({ url: $buttonAction, funcEnd: 'finishFinalize' })";
+				}
+
+				$buttonFunction .= PHP_EOL . "\t\tfunction {$buttonId}Function () {" . $func_nl .
+					'clearTimeout(myRefresh);' . $func_nl .
+					"$('#text').text('{$buttonArray['status']}');" . $func_nl .
+					"pulsate('#text');" . $func_nl .
+					$callbackFunction . ';' . $func_el .
+					'Pace.stop();' . $func_el .
+					'};' . PHP_EOL;
+			}
+		}
+
+		return $buttonFunction;
+	}
+
+	private function create_javascript() : string {
+		$applyFilter   = "'" . $this->form_action;
+		$clearFilter   = $applyFilter;
+		$defaultFilter = $applyFilter;
+
+		if (!str_contains($applyFilter, '?')) {
 			$separator = '?';
 		} else {
 			$separator = '&';
 		}
 
-		$applyFilter .= $separator . 'header=false';
-		$clearFilter .= $separator . 'header=false&clear=true"';
-		$changeChain  = '';
+		$applyFilter .= $separator;
 
-		$separator = "\"+\"&";
+		$clearFilter .= $separator . "clear=true'";
+		$defaultFilter .= $separator . "action=noaction'";
+
+		$changeChain   = '';
+		$clickChain    = '';
+
+		if (isset($this->filter_array['buttons']['go']['callback'])) {
+			$changeFunction = $this->filter_array['buttons']['go']['callback'];
+		} else {
+			$changeFunction = 'applyFilter()';
+		}
+
+		if (isset($this->filter_array['buttons']['clear']['callback'])) {
+			$clearFunction = $this->filter_array['buttons']['clear']['callback'];
+		} else {
+			$clearFunction = 'clearFilter()';
+		}
+
+		$filterLength    = 0;
+		$refreshMSeconds = 9999999;
+		$buttonFunctions = '';
+		$buttonReady     = '';
+		$readyAdd        = '';
+		$globalAdd       = '';
 
 		if (isset($this->filter_array['rows'])) {
-			foreach($this->filter_array['rows'] as $index => $row) {
-				foreach($row as $field_name => $field_array) {
+			foreach ($this->filter_array['rows'] as $row) {
+				foreach ($row as $field_name => $field_array) {
 					switch($field_array['method']) {
-					case 'button':
-					case 'submit':
-						break;
-					case 'checkbox':
-						$applyFilter .= $separator . $field_name . "=\"+\"$(\'#" . $field_name . "').is(':checked')";
-						break;
-					case 'textbox':
-					case 'drop_array':
-					case 'drop_files':
-					case 'drop_sql':
-					case 'drop_callback':
-					case 'drop_multi':
-					case 'drop_color':
-					case 'drop_tree':
-						if ($field_array['method'] != 'textbox') {
-							$changeChain .= ($changeChain != '' ? ', ':'') . '#' . $field_name;
-						}
-						$applyFilter .= $separator . $field_name . "=\"+\"$(\'#" . $field_name . "').val()";
-						break;
-					default:
+						case 'content':
+						case 'validate':
+						case 'hidden':
+							// Just for validating other request variables
+
+							break;
+						case 'button':
+							switch($field_name) {
+								case 'go':
+								case 'clear':
+									break;
+								default:
+									$buttonAction = str_replace('noaction', $field_name, $defaultFilter);
+
+									$buttonFunctions .= $this->make_function($field_name, $field_array, $buttonAction);
+
+									$buttonReady .= PHP_EOL . "\t\t\t$('#{$field_name}').click(function() { {$field_name}Function(); });";
+							}
+
+							break;
+						case 'filter_checkbox':
+							if ($this->dynamic) {
+								$clickChain .= ($clickChain != '' ? ', ' : '') . '#' . $field_name;
+							}
+
+							$applyFilter .= ($filterLength == 0 ? '' : "+'&") . $field_name . "='+$('#" . $field_name . "').is(':checked')";
+							$filterLength++;
+
+							break;
+						case 'timespan':
+							if (!isset($field_array['span_function'])) {
+								$readyAdd .= "$('#predefined_timespan').change( function() { applyGraphTimespan(); });" . PHP_EOL;
+							} else {
+								$readyAdd .= "$('#predefined_timespan').change( function() { " . $field_array['span_function'] . '; });' . PHP_EOL;
+							}
+
+							if (isset($field_array['shifter']) && $field_array['shifter'] === true) {
+								if (!isset($field_array['lshift_function'])) {
+									$readyAdd .= "$('#shift_left').click( function() { timeshiftGraphFilterLeft(); });" . PHP_EOL;
+								} else {
+									$readyAdd .= "$('#shift_left').click( function() { " . $field_array['lshift_function'] . '; });' . PHP_EOL;
+								}
+
+								if (!isset($field_array['rshift_function'])) {
+									$readyAdd .= "$('#shift_right').click( function() { timeshiftGraphFilterRight(); });" . PHP_EOL;
+								} else {
+									$readyAdd .= "$('#shift_right').click( function() { " . $field_array['rshift_function'] . '; });' . PHP_EOL;
+								}
+							}
+
+							if (!isset($field_array['refresh_function'])) {
+								$readyAdd .= "$('#tsrefresh').click( function() { refreshGraphTimespanFilter(); });" . PHP_EOL;
+							} else {
+								$readyAdd .= "$('#tsrefresh').click( function() { " . $field_array['refresh_function'] . '; });' . PHP_EOL;
+							}
+
+							if (!isset($field_array['clear_function'])) {
+								$readyAdd .= "$('#tsclear').click( function() { clearGraphTimespanFilter(); });" . PHP_EOL;
+							} else {
+								$readyAdd .= "$('#tsclear').click( function() { " . $field_array['clear_function'] . '; });' . PHP_EOL;
+							}
+
+							break;
+						case 'textbox':
+						case 'drop_array':
+						case 'drop_files':
+						case 'drop_sql':
+						case 'drop_callback':
+						case 'drop_multi':
+						case 'drop_color':
+						case 'drop_tree':
+							if ($field_array['method'] != 'textbox' && $this->dynamic) {
+								if (!isset($field_array['dynamic']) || $field_array['dynamic'] === true) {
+									$changeChain .= ($changeChain != '' ? ', ' : '') . '#' . $field_name;
+								}
+							}
+
+							if ($field_name != 'rfilter') {
+								$applyFilter .= ($filterLength == 0 ? '' : "+'&") . $field_name . "='+$('#" . $field_name . "').val()";
+							} else {
+								$applyFilter .= ($filterLength == 0 ? '' : "+'&") . $field_name . "='+base64_encode($('#" . $field_name . "').val())";
+							}
+							$filterLength++;
+
+							break;
+						case 'submit':
+							break;
+						default:
+							break;
+					}
+
+					if ($this->has_refresh && $field_name == 'refresh') {
+						$refreshMSeconds = $field_array['value'] * 1000;
 					}
 				}
 			}
 
-			$applyFilter .= '";';
+			if ($filterLength == 0) {
+				$applyFilter .= "';";
+			} else {
+				$applyFilter .= ';';
+			}
 		}
 
-		?>
-		<script type='text/javascript' <?php print CactiSecureHeaders::getNonceAttribute();?>>
+		if (isset($this->filter_array['javascript']['ready']) && $this->filter_array['javascript']['ready'] != '') {
+			$readyAdd .= "\t\t" . trim($this->filter_array['javascript']['ready']) . PHP_EOL;
+		}
 
+		if (isset($this->filter_array['javascript']['global']) && $this->filter_array['javascript']['global'] != '') {
+			$globalAdd .= "\t\t" . trim($this->filter_array['javascript']['global']) . PHP_EOL;
+		}
+
+		if (!$this->has_refresh && isrv('refresh') && grv('refresh') > 0) {
+			$refreshMSeconds = grv('refresh') * 1000;
+		}
+
+		if ($clickChain != '') {
+			$clickReady = "$('" . $clickChain . "').click(function() {\n\t\t\t\t" .
+				"$changeFunction;\n\t\t\t" .
+			'});' . PHP_EOL;
+		} else {
+			$clickReady = '';
+		}
+
+		if ($changeChain != '') {
+			$changeReady = "$('" . $changeChain . "').change(function() {\n\t\t\t\t" .
+				"$changeFunction;\n\t\t\t" .
+			'});' . PHP_EOL;
+		} else {
+			$changeReady = '';
+		}
+
+		return PHP_EOL . "<script type='text/javascript'>
+		$globalAdd
 		function applyFilter() {
-			strURL = <?php print $applyFilter;?>
-			loadPageNoHeader(strURL);
+			strURL = $applyFilter
+			loadUrl({ url: strURL });
 		}
 
 		function clearFilter() {
-			loadPageNoHeader(<?php print $clearFilter;?>);
+			strURL = $clearFilter
+			loadUrl({ url: strURL });
 		}
 
+		function finishFinalize(options, data) {
+			$('#text').text('Finished').fadeOut(2000);
+		}
+		$buttonFunctions
+
 		$(function() {
-			$('#<?php print html_escape($this->form_id);?>').on('submit', function(event) {
+			if ($('#refresh').length) {
+				refreshFunction = '$changeFunction';
+				refreshMSeconds = $refreshMSeconds;
+				refreshIsLogout = false;
+				setupPageTimeout();
+
+				$('#refresh').on('selectmenuopen', function() {
+					if (myRefresh > 0) {
+						clearTimeout(myRefresh);
+					}
+				});
+			} else if (myRefresh > 0) {
+				clearTimeout(myRefresh);
+			}
+
+			$('#" . $this->form_id . "').submit(function(event) {
 				event.preventDefault();
-				applyFilter();
+				$changeFunction;
 			});
 
-			$('<?php print $changeChain;?>').on('change', function() {
-				applyFilter();
+			$('#clear').click(function() {
+				$clearFunction;
 			});
 
-			$('#clear').on('click', function() {
-				clearFilter();
-			})
+			$readyAdd
+			$changeReady
+			$clickReady
+			$buttonReady
 		});
-		</script>
-
-		<?php
+	</script>" . PHP_EOL;
 	}
 
-	private function sanitize_filter_variables() {
-		$filters = array();
+	private function sanitize_filter_variables() : void {
+		$filters = [];
 
 		if (isset($this->filter_array['rows'])) {
-			foreach($this->filter_array['rows'] as $index => $row) {
-				foreach($row as $field_name => $field_array) {
+			foreach ($this->filter_array['rows'] as $row) {
+				foreach ($row as $field_name => $field_array) {
 					switch($field_array['method']) {
-					case 'button':
-					case 'submit':
-						break;
-					default:
-						$filters[$field_name]['filter'] = $field_array['filter'];
+						case 'timespan':
+						case 'button':
+						case 'submit':
+							break;
+						default:
+							$filters[$field_name]['filter'] = $field_array['filter'];
 
-						if (isset($field_array['filter_options'])) {
-							$filters[$field_name]['options'] = $field_array['filter_options'];
-						}
+							if (isset($field_array['filter_options'])) {
+								$filters[$field_name]['options'] = $field_array['filter_options'];
+							}
 
-						if (isset($field_array['pageset'])) {
-							$filters[$field_name]['pageset'] = $field_array['pageset'];
-						}
+							if (isset($field_array['pageset'])) {
+								$filters[$field_name]['pageset'] = $field_array['pageset'];
+							}
 
-						if (isset($field_array['default'])) {
-							$filters[$field_name]['default'] = $field_array['default'];
-						} else {
-							$filters[$field_name]['default'] = '';
-						}
+							if (isset($field_array['default'])) {
+								$filters[$field_name]['default'] = $field_array['default'];
+							} else {
+								$filters[$field_name]['default'] = '';
+							}
 
-						break;
+							break;
 					}
 				}
 			}
 		}
 
-		if (isset($this->filter_array['sort'])) {
-			$sort_default = $this->filter_array['sort']['sort_column'];
+		$filters['page']['filter']  = FILTER_VALIDATE_INT;
+		$filters['page']['default'] = 1;
 
+		if (!isrv('page')) {
+			srv('page', 1);
+		}
+
+		if (isset($this->filter_array['sort'])) {
 			$filters['sort_column']['filter']     = FILTER_CALLBACK;
-			$filters['sort_column']['options']    = array('options' => function ($v) use ($sort_default) {
-				return preg_match('/^[a-zA-Z_][a-zA-Z0-9_.]*$/', $v) ? $v : $sort_default;
-			});
-			$filters['sort_column']['default']    = $sort_default;
+			$filters['sort_column']['options']    = ['options' => 'sanitize_search_string'];
+			$filters['sort_column']['default']    = $this->filter_array['sort']['sort_column'];
 
 			$filters['sort_direction']['filter']  = FILTER_CALLBACK;
-			$filters['sort_direction']['options'] = array('options' => function ($v) {
-				$v = strtoupper(trim($v));
-
-				return in_array($v, array('ASC', 'DESC'), true) ? $v : 'ASC';
-			});
+			$filters['sort_direction']['options'] = ['options' => 'sanitize_search_string'];
 			$filters['sort_direction']['default'] = $this->filter_array['sort']['sort_direction'];
 		}
 

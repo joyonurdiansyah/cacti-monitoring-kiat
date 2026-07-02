@@ -22,7 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
-function upgrade_to_1_1_36() {
+function upgrade_to_1_1_36() : void {
 	// Repair locales
 	$def_locale = repair_locale(read_config_option('i18n_default_language'));
 	set_config_option('i18n_default_language', $def_locale);
@@ -33,15 +33,15 @@ function upgrade_to_1_1_36() {
 	$users_to_update = $users_to_update_results['data'];
 
 	if (cacti_sizeof($users_to_update)) {
-		foreach($users_to_update as $user) {
-			if (strpos($user['value'], '-') === false) {
+		foreach ($users_to_update as $user) {
+			if (!str_contains($user['value'], '-')) {
 				$locale = repair_locale($user['value']);
 
 				db_install_execute('UPDATE settings_user
 					SET value = ?
 					WHERE user_id = ?
 					AND name = ?',
-					array($locale, $user['user_id'], $user['name']));
+					[$locale, $user['user_id'], $user['name']]);
 			}
 		}
 	}
@@ -52,17 +52,16 @@ function upgrade_to_1_1_36() {
 	$groups_to_update = $groups_to_update_results['data'];
 
 	if (cacti_sizeof($groups_to_update)) {
-		foreach($groups_to_update as $group) {
-			if (strpos($group['value'], '-') === false) {
+		foreach ($groups_to_update as $group) {
+			if (!str_contains($group['value'], '-')) {
 				$locale = repair_locale($group['value']);
 
 				db_install_execute('UPDATE settings_user_group
 					SET value = ?
 					WHERE group_id = ?
 					AND name = ?',
-					array($locale, $group['group_id'], $group['name']));
+					[$locale, $group['group_id'], $group['name']]);
 			}
 		}
 	}
 }
-

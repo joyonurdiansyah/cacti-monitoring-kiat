@@ -14,7 +14,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -27,44 +27,25 @@ ini_set('output_buffering', 'Off');
 
 require(__DIR__ . '/../include/cli_check.php');
 
-require_once($config['base_path'] . '/lib/utility.php');
+require_once(CACTI_PATH_LIBRARY . '/utility.php');
 
 ini_set('max_execution_time', '0');
 ini_set('memory_limit', '-1');
 
-/* process calling arguments */
+// process calling arguments
 $parms = $_SERVER['argv'];
 array_shift($parms);
 
 $php_binary = read_config_option('path_php_binary');
 
+$parameters = implode(' ', $parms);
+
 cacti_log('WARNING: Deprecated script push_out_hosts.php. Please use rebuild_poller_cache.php.', false, 'PUSHOUT');
 
-if (in_array('-v', $parms) || in_array('-V', $parms) || in_array('--version', $parms)) {
+if (in_array('-v', $parms, true) || in_array('-V', $parms, true) || in_array('--version', $parms, true)) {
 	// exception for github tests
-	print 'Cacti Push out hosts/repopulate poller cache Tool, Version ' . get_cacti_cli_version() . ' ' . COPYRIGHT_YEARS . PHP_EOL;
+	print 'Cacti Repopulate poller cache Tool, Version ' . CACTI_VERSION . ' ' . COPYRIGHT_YEARS . PHP_EOL;
 } else {
 	print 'WARNING: Deprecated script push_out_hosts.php. Please use rebuild_poller_cache.php.' . PHP_EOL;
-
-	if (!is_string($php_binary) || trim($php_binary) === '') {
-		cacti_log('ERROR: Rejected an empty PHP binary.', false, 'SYSTEM');
-
-		exit(1);
-	}
-
-	if (strpos(trim($php_binary), '-') === 0) {
-		cacti_log('ERROR: Rejected PHP binary starting with dash: ' . $php_binary, false, 'SYSTEM');
-
-		exit(1);
-	}
-
-	$args = array_merge(array($config['base_path'] . '/cli/rebuild_poller_cache.php'), $parms);
-
-	$command = cacti_escapeshellcmd($php_binary) . ' ' . implode(' ', array_map('cacti_escapeshellarg', $args));
-
-	$exit_code = 0;
-
-	passthru($command, $exit_code);
-
-	exit($exit_code);
+	passthru($php_binary . ' ' . CACTI_PATH_CLI . '/rebuild_poller_cache.php ' . $parameters);
 }

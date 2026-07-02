@@ -23,26 +23,58 @@
 */
 
 /**
+ * Safely deserialize the bulk-action selected_items payload.
+ *
+ * Bulk report items carry a 'type_id' shape (e.g. 'reports_3'), so the
+ * numeric-only sanitize_unserialize_selected_items() cannot be used here:
+ * it rejects every non-numeric element and discards the whole batch. Object
+ * deserialization is blocked the same way the numeric variant blocks it;
+ * each element's type and id are validated by the caller.
+ *
+ * @param mixed $items A serialized array of items from a post
+ *
+ * @return array|false The deserialized items array, or false when input is absent/invalid
+ */
+function reports_unserialize_selected_items(mixed $items) : array|false {
+	if (empty($items) || !is_string($items)) {
+		return false;
+	}
+
+	$unstripped = stripslashes($items);
+
+	if (!preg_match('/^a:[0-9]+:{/', $unstripped) || preg_match('/(^|;|{|})O:\+?[0-9]+:"/', $unstripped)) {
+		return false;
+	}
+
+	$items = unserialize($unstripped, ['allowed_classes' => false]);
+
+	return is_array($items) ? $items : false;
+}
+
+/**
  * duplicate_reports - duplicates a report and all items
  *
- * @param int $_id       - id of the report
- * @param string $_title - title of the new report
+ * @param int    $_id    Id of the report
+ * @param string $_title Title of the new report
+ *
+ * @return void
  */
-function duplicate_reports($_id, $_title) {
+function duplicate_reports(int $_id, string $_title) : void {
 	global $fields_reports_edit;
 	reports_log(__FUNCTION__ . ', id: ' . $_id, false, 'REPORTS TRACE', POLLER_VERBOSITY_MEDIUM);
 
 	$report = db_fetch_row_prepared('SELECT *
 		FROM reports
 		WHERE id = ?',
-		array($_id));
+		[$_id]);
 
 	$reports_items = db_fetch_assoc_prepared('SELECT *
 		FROM reports_items
 		WHERE report_id = ?',
-		array($_id));
+		[$_id]);
 
-	$save = array();
+	$save = [];
+
 	foreach ($fields_reports_edit as $field => $array) {
 		if (!preg_match('/^hidden/', $array['method']) &&
 			!preg_match('/^spacer/', $array['method'])) {
@@ -50,40 +82,45 @@ function duplicate_reports($_id, $_title) {
 		}
 	}
 
-	/* duplicate to your id */
-	$save['user_id'] = $_SESSION['sess_user_id'];
+	// duplicate to your id
+	$save['user_id'] = $_SESSION[SESS_USER_ID];
 
-	/* substitute the title variable */
+	// substitute the title variable
 	$save['name'] = str_replace('<name>', $report['name'], $_title);
-	/* create new rule */
+	// create new rule
 	$save['enabled'] = '';
-	$save['id'] = 0;
-	$reports_id  = sql_save($save, 'reports');
+	$save['id']      = 0;
+	$reports_id      = sql_save($save, 'reports');
 
-	/* create new rule items */
+	// create new rule items
 	if (cacti_sizeof($reports_items) > 0) {
 		foreach ($reports_items as $reports_item) {
-			$save = $reports_item;
-			$save['id'] = 0;
+			$save              = $reports_item;
+			$save['id']        = 0;
 			$save['report_id'] = $reports_id;
-			$reports_item_id = sql_save($save, 'reports_items');
+			$reports_item_id   = sql_save($save, 'reports_items');
 		}
 	}
 }
 
-function reports_add_devices($report_id, $device_ids, $timespan, $align) {
-	if (!cacti_authorize_resource($_SESSION['sess_user_id'], (int) $report_id, 'reports')) {
+function reports_add_devices(int $report_id, array $device_ids, array $timespan, string $align) : bool {
+	$report_user = db_fetch_cell_prepared('SELECT user_id
+		FROM reports
+		WHERE id = ?',
+		[$report_id]);
+
+	if ($report_user != $_SESSION[SESS_USER_ID]) {
 		raise_message('reports_not_owner');
 
 		return false;
 	} else {
 		$errors = 0;
 
-		foreach($device_ids as $device_id) {
+		foreach ($device_ids as $device_id) {
 			$sequence = db_fetch_cell_prepared('SELECT MAX(sequence)
 				FROM reports_items
 				WHERE report_id = ?',
-				array($report_id)) + 1;
+				[$report_id]) + 1;
 
 			$exists = db_fetch_cell_prepared('SELECT id
 				FROM reports_items
@@ -91,29 +128,29 @@ function reports_add_devices($report_id, $device_ids, $timespan, $align) {
 				AND item_type = 5
 				AND report_id = ?
 				AND timespan = ?',
-				array($device_id, $report_id, $timespan));
+				[$device_id, $report_id, $timespan]);
 
 			$device_exists = db_fetch_cell_prepared('SELECT id
 				FROM host
 				WHERE id = ?',
-				array($device_id));
+				[$device_id]);
 
 			$description = db_fetch_cell_prepared('SELECT description
 				FROM host
 				WHERE id = ?',
-				array($device_id));
+				[$device_id]);
 
 			if (!$exists) {
 				if ($device_exists > 0) {
 					$host_template_id = db_fetch_cell_prepared('SELECT host_template_id
 						FROM host
 						WHERE id = ?',
-						array($device_id));
+						[$device_id]);
 
 					$site_id = db_fetch_cell_prepared('SELECT site_id
 						FROM host
 						WHERE id = ?',
-						array($device_id));
+						[$device_id]);
 
 					// Setup defaults
 					$graph_template_id = -1;
@@ -122,7 +159,7 @@ function reports_add_devices($report_id, $device_ids, $timespan, $align) {
 					db_execute_prepared('INSERT INTO reports_items
 						(report_id, item_type, host_template_id, site_id, host_id, graph_template_id, local_graph_id, timespan, align, sequence)
 						VALUES (?, 5, ?, ?, ?, ?, ?, ?, ?, ?)',
-						array(
+						[
 							$report_id,
 							$host_template_id,
 							$site_id,
@@ -132,7 +169,7 @@ function reports_add_devices($report_id, $device_ids, $timespan, $align) {
 							$timespan,
 							$align,
 							$sequence
-						)
+						]
 					);
 
 					raise_message('reports_add_device_' . $device_id, __('Device \'%s\' successfully added to Report.', $description), MESSAGE_LEVEL_INFO);
@@ -154,8 +191,13 @@ function reports_add_devices($report_id, $device_ids, $timespan, $align) {
 	}
 }
 
-function reports_add_graphs($report_id, $local_graph_id, $timespan, $align) {
-	if (!cacti_authorize_resource($_SESSION['sess_user_id'], (int) $report_id, 'reports')) {
+function reports_add_graphs(int $report_id, int $local_graph_id, array $timespan, string $align) : bool {
+	$report_user = db_fetch_cell_prepared('SELECT user_id
+		FROM reports
+		WHERE id = ?',
+		[$report_id]);
+
+	if ($report_user != $_SESSION[SESS_USER_ID]) {
 		raise_message('reports_not_owner');
 
 		return false;
@@ -163,31 +205,31 @@ function reports_add_graphs($report_id, $local_graph_id, $timespan, $align) {
 		$sequence = db_fetch_cell_prepared('SELECT MAX(sequence)
 			FROM reports_items
 			WHERE report_id = ?',
-			array($report_id)) + 1;
+			[$report_id]) + 1;
 
 		$exists = db_fetch_cell_prepared('SELECT id
 			FROM reports_items
 			WHERE local_graph_id = ?
 			AND report_id = ?
 			AND timespan = ?',
-			array($local_graph_id, $report_id, $timespan));
+			[$local_graph_id, $report_id, $timespan]);
 
 		if (!$exists) {
 			$gd = db_fetch_row_prepared('SELECT *
 				FROM graph_local
 				WHERE id = ?',
-				array($local_graph_id));
+				[$local_graph_id]);
 
 			$host_template_id = db_fetch_cell_prepared('SELECT host_template_id
 				FROM host
 				WHERE id = ?',
-				array($gd['host_id']));
+				[$gd['host_id']]);
 
 			if (cacti_sizeof($gd)) {
 				db_execute_prepared('INSERT INTO reports_items
 					(report_id, item_type, host_template_id, host_id, graph_template_id, local_graph_id, timespan, align, sequence)
 					VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)',
-					array(
+					[
 						$report_id,
 						$host_template_id,
 						$gd['host_id'],
@@ -196,7 +238,7 @@ function reports_add_graphs($report_id, $local_graph_id, $timespan, $align) {
 						$timespan,
 						$align,
 						$sequence
-					)
+					]
 				);
 
 				return true;
@@ -214,22 +256,22 @@ function reports_add_graphs($report_id, $local_graph_id, $timespan, $align) {
 /**
  * reports_date_time_format - fetches the date/time formatting information for current user
  *
- * @return string - string defining the datetime format specific to this user
+ * @return string String defining the datetime format specific to this user
  */
-function reports_date_time_format() {
-	$datechar = array(
+function reports_date_time_format() : string {
+	$datechar = [
 		GDC_HYPHEN => '-',
 		GDC_SLASH  => '/',
 		GDC_DOT    => '.'
-	);
+	];
 
 	$graph_date = '';
 
-	/* setup date format */
+	// setup date format
 	$date_fmt        = read_config_option('default_date_format');
 	$dateCharSetting = read_config_option('default_datechar');
 
-	if (empty($dateCharSetting)) {
+	if ($dateCharSetting == '') {
 		$dateCharSetting = GDC_SLASH;
 	}
 
@@ -238,21 +280,27 @@ function reports_date_time_format() {
 	switch ($date_fmt) {
 		case GD_MO_D_Y:
 			$graph_date = 'm' . $datecharacter . 'd' . $datecharacter . 'Y H:i:s';
+
 			break;
 		case GD_MN_D_Y:
 			$graph_date = 'M' . $datecharacter . 'd' . $datecharacter . 'Y H:i:s';
+
 			break;
 		case GD_D_MO_Y:
 			$graph_date = 'd' . $datecharacter . 'm' . $datecharacter . 'Y H:i:s';
+
 			break;
 		case GD_D_MN_Y:
 			$graph_date = 'd' . $datecharacter . 'M' . $datecharacter . 'Y H:i:s';
+
 			break;
 		case GD_Y_MO_D:
 			$graph_date = 'Y' . $datecharacter . 'm' . $datecharacter . 'd H:i:s';
+
 			break;
 		case GD_Y_MN_D:
 			$graph_date = 'Y' . $datecharacter . 'M' . $datecharacter . 'd H:i:s';
+
 			break;
 	}
 
@@ -264,64 +312,73 @@ function reports_date_time_format() {
 /**
  * reports_interval_start - computes the next start time for the given set of parameters
  *
- * @param int $interval  - given interval
- * @param int $count     - given repeat count
- * @param int $offset    - offset in seconds to be added to the new start time
- * @param int $timestamp - current start time for report
+ * @param int $interval  Given interval
+ * @param int $count     Given repeat count
+ * @param int $offset    Offset in seconds to be added to the new start time
+ * @param int $timestamp Current start time for report
  *
- * @return - new timestamp
+ * @return int New timestamp
  */
-function reports_interval_start($interval, $count, $offset, $timestamp) {
+function reports_interval_start(int $interval, int $count, int $offset, int $timestamp) : int {
 	global $reports_interval;
 	reports_log(__FUNCTION__ . ', interval: ' . $reports_interval[$interval] . ' count: ' . $count . ' offset: ' . $offset . ' timestamp: ' . date('Y/m/d H:i:s', $timestamp), false, 'REPORTS TRACE', POLLER_VERBOSITY_MEDIUM);
 
 	switch ($interval) {
 		case REPORTS_SCHED_INTVL_MINUTE:
-			# add $count minutes to current mailtime
+			// add $count minutes to current mailtime
 			$ts = utime_add($timestamp, 0, 0, 0, 0, $count, $offset);
+
 			break;
 		case REPORTS_SCHED_INTVL_HOUR:
-			# add $count hours to current mailtime
+			// add $count hours to current mailtime
 			$ts = utime_add($timestamp, 0, 0, 0, $count, 0, $offset);
+
 			break;
 		case REPORTS_SCHED_INTVL_DAY:
-			# add $count days to current mailtime
+			// add $count days to current mailtime
 			$ts = utime_add($timestamp, 0, 0, $count, 0, 0, $offset);
+
 			break;
 		case REPORTS_SCHED_INTVL_WEEK:
-			# add $count weeks = 7*$count days to current mailtime
-			$ts = utime_add($timestamp, 0, 0, 7*$count, 0, 0, $offset);
+			// add $count weeks = 7*$count days to current mailtime
+			$ts = utime_add($timestamp, 0, 0, 7 * $count, 0, 0, $offset);
+
 			break;
 		case REPORTS_SCHED_INTVL_MONTH_DAY:
-			# add $count months to current mailtime
+			// add $count months to current mailtime
 			$ts = utime_add($timestamp, 0, $count, 0, 0, 0, $offset);
+
 			break;
 		case REPORTS_SCHED_INTVL_MONTH_WEEKDAY:
-			# add $count months to current mailtime, but if this is the nth weekday, it must be the same nth weekday in the new month
-			# e.g. if this is currently the 3rd Monday of current month
-			# ist must be the 3rd Monday of the new month as well
+			// add $count months to current mailtime, but if this is the nth weekday, it must be the same nth weekday in the new month
+			// e.g. if this is currently the 3rd Monday of current month
+			// it must be the 3rd Monday of the new month as well
 			$weekday      = date('l', $timestamp);
 			$day_of_month = date('j', $timestamp);
 			$nth_weekday  = ceil($day_of_month / 7);
 
 			$date_str     = '+' . $count . ' months';
 			$month_base   = strtotime($date_str, $timestamp);
-			$new_month    = mktime(date('H', $month_base), date('i', $month_base), date('s', $month_base), date('m', $month_base), 1, date('Y', $month_base));
+			$new_month    = mktime((int) date('H', $month_base), (int) date('i', $month_base), (int) date('s', $month_base), (int) date('m', $month_base), 1, (int) date('Y', $month_base));
 
 			$date_str     = '+' . ($nth_weekday - 1) . ' week ' . $weekday;
 			$base         = strtotime($date_str, $new_month);
-			$ts           = mktime(date('H', $month_base), date('i', $month_base), date('s', $month_base), date('m', $base), date('d', $base), date('Y', $base));
+			$ts           = mktime((int) date('H', $month_base), (int) date('i', $month_base), (int) date('s', $month_base), (int) date('m', $base), (int) date('d', $base), (int) date('Y', $base));
+
 			break;
 		case REPORTS_SCHED_INTVL_YEAR:
-			# add $count years to current mailtime
+			// add $count years to current mailtime
 			$ts = utime_add($timestamp, $count, 0, 0, 0, 0, $offset);
+
 			break;
 		default:
 			$ts = 0;
+
 			break;
 	}
 
 	$now = time();
+
 	if ($ts < $now) {
 		$ts = $now;
 	}
@@ -332,24 +389,25 @@ function reports_interval_start($interval, $count, $offset, $timestamp) {
 /**
  * utime_add - add offsets to given timestamp
  *
- * @param int $timestamp- base timestamp
- * @param int $yr		- offset in years
- * @param int $mon		- offset in months
- * @param int $day		- offset in days
- * @param int $hr		- offset in hours
- * @param int $min		- offset in minutes
- * @param int $sec		- offset in seconds
+ * @param int $timestamp The base timestamp
+ * @param int $yr        The offset in years
+ * @param int $mon       The offset in months
+ * @param int $day       The offset in days
+ * @param int $hr        The offset in hours
+ * @param int $min       The offset in minutes
+ * @param int $sec       The offset in seconds
  *
- * @return				- unix time
+ * @return int unix timestamp
  */
-function utime_add($timestamp, $yr = 0, $mon = 0, $day = 0, $hr = 0, $min = 0, $sec = 0) {
+function utime_add(int $timestamp, int $yr = 0, int $mon = 0,
+	int $day = 0, int $hr = 0, int $min = 0, int $sec = 0) : int {
 	$dt = localtime($timestamp, true);
 
 	$unixnewtime = mktime(
 		$dt['tm_hour'] + $hr,
-		$dt['tm_min']  + $min,
-		$dt['tm_sec']  + $sec,
-		$dt['tm_mon']  + 1 + $mon,
+		$dt['tm_min'] + $min,
+		$dt['tm_sec'] + $sec,
+		$dt['tm_mon'] + 1 + $mon,
 		$dt['tm_mday'] + $day,
 		$dt['tm_year'] + 1900 + $yr
 	);
@@ -360,12 +418,15 @@ function utime_add($timestamp, $yr = 0, $mon = 0, $day = 0, $hr = 0, $min = 0, $
 /**
  * reports_log - logs a string to Cacti's log file or optionally to the browser
  *
- * @param string $string  - the string to append to the log file
- * @param bool $output    - whether to output the log line to the browser using pring() or not
- * @param string $environ - tell's from where the script was called from
+ * @param string $string  The string to append to the log file
+ * @param bool   $output  Whether to output the log line to the browser using pring() or not
+ * @param string $environ Tell's from where the script was called from
+ * @param int    $level   The logging verbosity to use
+ *
+ * @return void
  */
-function reports_log($string, $output = false, $environ = 'REPORTS', $level = POLLER_VERBOSITY_NONE) {
-	# Define REPORTS_DEBUG if not already set
+function reports_log(string $string, bool $output = false, string $environ = 'REPORTS', int $level = POLLER_VERBOSITY_NONE) : void {
+	// Define REPORTS_DEBUG if not already set
 	if (!defined('REPORTS_DEBUG')) {
 		if (function_exists('read_config_option')) {
 			define('REPORTS_DEBUG', read_config_option('reports_log_verbosity'));
@@ -374,8 +435,8 @@ function reports_log($string, $output = false, $environ = 'REPORTS', $level = PO
 		}
 	}
 
-	# if current verbosity >= level of current message, print it
-	if (strpos($string, 'STATS') !== false) {
+	// if current verbosity >= level of current message, print it
+	if (str_contains($string, 'STATS')) {
 		cacti_log($string, $output, 'SYSTEM');
 	} elseif (REPORTS_DEBUG >= $level) {
 		cacti_log($string, $output, $environ);
@@ -385,41 +446,51 @@ function reports_log($string, $output = false, $environ = 'REPORTS', $level = PO
 /**
  * generate_report - create the complete mail for a single report and send it
  *
- * @param array $report - complete row of reports table for the report to work upon
- * @param bool $force   - when forced, lastsent time will not be entered (e.g. Send Now)
+ * @param int   $schedule_id The id of the queued up report that is being processed
+ * @param array $report      Complete row of reports table for the report to work upon
+ * @param bool  $force       When forced, lastsent time will not be entered (e.g. Send Now)
+ *
+ * @return bool The success of the report
  */
-function generate_report($report, $force = false) {
-	global $config, $alignment, $reports_interval, $attach_types;
+function generate_report(int $schedule_id, array $report, bool $force = false) : bool {
+	global $alignment, $reports_interval, $attach_types;
 
-	include_once($config['base_path'] . '/lib/time.php');
-	include_once($config['base_path'] . '/lib/rrd.php');
-	include_once($config['base_path'] . '/lib/html_reports.php');
+	include_once(CACTI_PATH_LIBRARY . '/time.php');
+	include_once(CACTI_PATH_LIBRARY . '/rrd.php');
+	include_once(CACTI_PATH_LIBRARY . '/html_reports.php');
 
 	reports_log(__FUNCTION__ . ', report_id: ' . $report['id'], false, 'REPORTS TRACE', POLLER_VERBOSITY_MEDIUM);
 
 	if (!reports_html_account_exists($report['user_id'])) {
 		reports_html_report_disable($report['id']);
+
 		return false;
 	}
 
-	$theme = 'classic';
+	if (!isrv('style') || grv('style') == 'true') {
+		$theme = 'modern';
+	} else {
+		$theme = get_selected_theme();
+	}
 
-	$body = reports_generate_html($report['id'], REPORTS_OUTPUT_EMAIL, $theme);
+	$body  = reports_generate_html($report['id'], REPORTS_OUTPUT_EMAIL, $theme);
 
-	$time = time();
+	$start_time  = time();
+	$start       = microtime(true);
 
-	# get config option for first-day-of-the-week
+	// get config option for first-day-of-the-week
 	$first_weekdayid = read_user_setting('first_weekdayid', false, false, $report['user_id']);
 
 	$offset      = 0;
-	$graphs      = array();
-	$attachments = array();
+	$graphs      = [];
+	$attachments = [];
+
 	while (true) {
 		$pos = strpos($body, '<GRAPH:', $offset);
 
 		if ($pos) {
-			$offset         = $pos+7;
-			$graph          = substr($body, $pos+7, 10);
+			$offset         = $pos + 7;
+			$graph          = substr($body, $pos + 7, 10);
 			$arr            = explode(':', $graph);
 			$arr1           = explode('>', $arr[1]);
 			$local_graph_id = $arr[0];
@@ -433,19 +504,21 @@ function generate_report($report, $force = false) {
 
 	$user = $report['user_id'];
 
-	$xport_meta = array();
+	$xport_meta = [];
 
 	if (cacti_sizeof($graphs)) {
-		foreach($graphs as $key => $local_graph_id) {
-			$arr = explode(':', $key);
-			$timesp = $arr[1];
+		foreach ($graphs as $key => $local_graph_id) {
+			$arr            = explode(':', $key);
+			$timesp         = intval($arr[1]);
+			$local_graph_id = intval($local_graph_id);
 
-			$timespan = array();
-			# get start/end time-since-epoch for actual time (now()) and given current-session-timespan
-			get_timespan($timespan, $time, $timesp, $first_weekdayid);
+			$timespan = [];
 
-			# provide parameters for rrdtool graph
-			$graph_data_array = array(
+			// get start/end time-since-epoch for actual time (now()) and given current-session-timespan
+			get_timespan($timespan, $start_time, $timesp, $first_weekdayid);
+
+			// provide parameters for rrdtool graph
+			$graph_data_array = [
 				'graph_start'    => $timespan['begin_now'],
 				'graph_end'      => $timespan['end_now'],
 				'graph_width'    => $report['graph_width'],
@@ -454,7 +527,7 @@ function generate_report($report, $force = false) {
 				'graph_theme'    => $theme,
 				'output_flag'    => RRDTOOL_OUTPUT_STDOUT,
 				'disable_cache'  => true
-			);
+			];
 
 			if ($report['thumbnails'] == 'on') {
 				$graph_data_array['graph_nolegend'] = true;
@@ -462,94 +535,70 @@ function generate_report($report, $force = false) {
 
 			switch($report['attachment_type']) {
 				case REPORTS_TYPE_INLINE_PNG:
-					$attachments[] = array(
-						'attachment' => @rrdtool_function_graph($local_graph_id, '', $graph_data_array, '', $xport_meta, $user),
+					$attachments[] = [
+						'attachment'     => base64_encode(rrdtool_function_graph($local_graph_id, '', $graph_data_array, null, $xport_meta, $user)),
 						'filename'       => 'graph_' . $local_graph_id . '.png',
 						'mime_type'      => 'image/png',
 						'local_graph_id' => $local_graph_id,
 						'timespan'       => $timesp,
 						'inline'         => 'inline'
-					);
+					];
+
 					break;
 				case REPORTS_TYPE_INLINE_JPG:
-					$attachments[] = array(
-						'attachment' => png2jpeg(@rrdtool_function_graph($local_graph_id, '', $graph_data_array, '', $xport_meta, $user)),
+					$attachments[] = [
+						'attachment'     => base64_encode(png2jpeg(rrdtool_function_graph($local_graph_id, '', $graph_data_array, null, $xport_meta, $user))),
 						'filename'       => 'graph_' . $local_graph_id . '.jpg',
 						'mime_type'      => 'image/jpg',
 						'local_graph_id' => $local_graph_id,
 						'timespan'       => $timesp,
 						'inline'         => 'inline'
-					);
+					];
+
 					break;
 				case REPORTS_TYPE_INLINE_GIF:
-					$attachments[] = array(
-						'attachment'     => png2gif(@rrdtool_function_graph($local_graph_id, '', $graph_data_array, '', $xport_meta, $user)),
+					$attachments[] = [
+						'attachment'     => base64_encode(png2gif(rrdtool_function_graph($local_graph_id, '', $graph_data_array, null, $xport_meta, $user))),
 						'filename'       => 'graph_' . $local_graph_id . '.gif',
 						'mime_type'      => 'image/gif',
 						'local_graph_id' => $local_graph_id,
 						'timespan'       => $timesp,
 						'inline'         => 'inline'
-					);
+					];
+
 					break;
 				case REPORTS_TYPE_ATTACH_PNG:
-					$attachments[] = array(
-						'attachment'     => @rrdtool_function_graph($local_graph_id, '', $graph_data_array, '', $xport_meta, $user),
+					$attachments[] = [
+						'attachment'     => base64_encode(rrdtool_function_graph($local_graph_id, '', $graph_data_array, null, $xport_meta, $user)),
 						'filename'       => 'graph_' . $local_graph_id . '.png',
 						'mime_type'      => 'image/png',
 						'local_graph_id' => $local_graph_id,
 						'timespan'       => $timesp,
 						'inline'         => 'attachment'
-					);
+					];
+
 					break;
 				case REPORTS_TYPE_ATTACH_JPG:
-					$attachments[] = array(
-						'attachment'     => png2jpeg(@rrdtool_function_graph($local_graph_id, '', $graph_data_array, '', $xport_meta, $user)),
+					$attachments[] = [
+						'attachment'     => base64_encode(png2jpeg(rrdtool_function_graph($local_graph_id, '', $graph_data_array, null, $xport_meta, $user))),
 						'filename'       => 'graph_' . $local_graph_id . '.jpg',
 						'mime_type'      => 'image/jpg',
 						'local_graph_id' => $local_graph_id,
 						'timespan'       => $timesp,
 						'inline'         => 'attachment'
-					);
+					];
+
 					break;
 				case REPORTS_TYPE_ATTACH_GIF:
-					$attachments[] = array(
-						'attachment'     => png2gif(@rrdtool_function_graph($local_graph_id, '', $graph_data_array, '', $xport_meta, $user)),
+					$attachments[] = [
+						'attachment'     => base64_encode(png2gif(rrdtool_function_graph($local_graph_id, '', $graph_data_array, null, $xport_meta, $user))),
 						'filename'       => 'graph_' . $local_graph_id . '.gif',
 						'mime_type'      => 'image/gif',
 						'local_graph_id' => $local_graph_id,
 						'timespan'       => $timesp,
 						'inline'         => 'attachment'
-					);
-					break;
-				case REPORTS_TYPE_INLINE_PNG_LN:
-					$attachments[] = array(
-						'attachment'     => @rrdtool_function_graph($local_graph_id, '', $graph_data_array, '', $xport_meta, $user),
-						'filename'       => '',	# LN does not accept filenames for inline attachments
-						'mime_type'      => 'image/png',
-						'local_graph_id' => $local_graph_id,
-						'timespan'       => $timesp,
-						'inline'         => 'inline'
-					);
-					break;
-				case REPORTS_TYPE_INLINE_JPG_LN:
-					$attachments[] = array(
-						'attachment'     => png2jpeg(@rrdtool_function_graph($local_graph_id, '', $graph_data_array, '', $xport_meta, $user)),
-						'filename'       => '',	# LN does not accept filenames for inline attachments
-						'mime_type'      => 'image/jpg',
-						'local_graph_id' => $local_graph_id,
-						'timespan'       => $timesp,
-						'inline'         => 'inline'
-					);
-					break;
-				case REPORTS_TYPE_INLINE_GIF_LN:
-					$attachments[] = array(
-						'attachment'     => png2gif(@rrdtool_function_graph($local_graph_id, '', $graph_data_array, '', $xport_meta, $user)),
-						'filename'       => '',	# LN does not accept filenames for inline attachments
-						'mime_type'      => 'image/gif',
-						'local_graph_id' => $local_graph_id,
-						'timespan'       => $timesp,
-						'inline'         => 'inline'
-					);
+					];
+
 					break;
 			}
 		}
@@ -561,99 +610,108 @@ function generate_report($report, $force = false) {
 		$subject = $report['name'];
 	}
 
-	if(!isset($report['bcc'])) {
+	if (!isset($report['bcc'])) {
 		$report['bcc'] = '';
 	}
 
-	$v = get_cacti_version();
+	if (api_plugin_installed('thold') && $report['notify_list'] > 0) {
+		$nl_to_emails  = get_notification_emails($report['notify_list'], 'to');
+		$nl_bcc_emails = get_notification_emails($report['notify_list'], 'bcc');
+
+		if ($nl_to_emails != '') {
+			$report['email'] .= ($report['email'] != '' ? ', ' : '') . $nl_to_emails;
+		}
+
+		if ($nl_bcc_emails != '') {
+			$report['bcc'] .= ($report['bcc'] != '' ? ', ' : '') . $nl_bcc_emails;
+		}
+	}
+
+	$v = CACTI_VERSION;
+
 	$headers['User-Agent'] = 'Cacti-Reports-v' . $v;
 
-	$error = mailer(
-		array($report['from_email'], $report['from_name']),
-		$report['email'],
-		'',
-		$report['bcc'],
-		'',
-		$subject,
-		$body,
-		'Cacti Reporting Requires and HTML Email Client',
-		$attachments,
-		$headers
-	);
+	if ($schedule_id > 0) {
+		$raw_data = $output_raw = $output_text = '';
+
+		reports_log_and_notify($schedule_id, $start_time, 'html', 'reports', $report['id'], $subject, $raw_data, $output_raw, $body, $output_text, $attachments, $headers);
+
+		$error = '';
+	} else {
+		$error = mailer(
+			[$report['from_email'], $report['from_name']],
+			$report['email'],
+			'',
+			$report['bcc'],
+			'',
+			$subject,
+			$body,
+			'Cacti Reporting Requires and HTML Email Client',
+			$attachments,
+			$headers
+		);
+	}
+
+	$end = microtime(true);
+
+	db_execute_prepared('UPDATE reports
+		SET last_started = ?, last_runtime = ?
+		WHERE id = ?',
+		[date('Y-m-d H:i:s', $start_time), $end - $start, $report['id']]);
 
 	if ($error != '') {
-		if (isset_request_var('id')) {
+		if (isrv('id')) {
 			raise_message('report_message', __esc('Problems sending Report \'%s\' Problem with e-mail Subsystem Error is \'%s\'', $report['name'], $error), MESSAGE_LEVEL_ERROR);
 		} else {
 			reports_log(__FUNCTION__ . ", Problems sending Report '" . $report['name'] . "'.  Problem with e-mail Subsystem Error is '$error'", false, 'REPORTS', POLLER_VERBOSITY_LOW);
 		}
 
 		return false;
-	} elseif (isset($_REQUEST)) {
-		raise_message('report_message', __esc('Report \'%s\' Sent Successfully', $report['name']), MESSAGE_LEVEL_INFO);
-
-		$int = read_config_option('poller_interval');
-
-		if (!$force) {
-			$next = reports_interval_start($report['intrvl'], $report['count'], $report['offset'], $report['mailtime']);
-
-			db_execute_prepared("UPDATE reports
-				SET mailtime = ?, lastsent = ?
-				WHERE id = ?",
-				array($next, time(), $report['id']));
-		} else {
-			db_execute_prepared("UPDATE reports
-				SET lastsent = ?
-				WHERE id = ?",
-				array(time(), $report['id']));
-		}
-
-		return true;
 	}
+
+	if (cacti_sizeof($_REQUEST)) {
+		raise_message('report_message', __esc('Report \'%s\' Sent Successfully', $report['name']), MESSAGE_LEVEL_INFO);
+	}
+
+	return true;
 }
 
-/** reports_load_format_file  read the format file from disk and determines its formatting
- * @param string $format_file		- the file to read from the formats directory
- * @param string $output			- the html and css output from that file
- * @param bool $report_tag_included - a boolean that informs the caller if the report tag is present
- * @return bool						- whether or not the format file was processed correctly
+/**
+ * reports_load_format_file  read the format file from disk and determines its formatting
+ *
+ * @param string $format_file The file to read from the formats directory
+ * @param string $output      The html and css output from that file
+ * @param bool   $report_tag  A boolean that informs the caller if the report tag is present
+ * @param mixed  $theme       The theme to use for display
+ *
+ * @return bool Whether or not the format file was processed correctly
  */
-function reports_load_format_file($format_file, &$output, &$report_tag_included, &$theme) {
-	global $config;
-
-	$contents = array();
+function reports_load_format_file(string $format_file, mixed &$output, bool &$report_tag = false, mixed &$theme = false) : bool {
+	$contents = [];
 
 	if ($format_file == '') {
 		$format_file = 'cacti_group.format';
 	}
 
-	$validated = validate_path_within($format_file, $config['base_path'] . '/formats');
-
-	if ($validated === false) {
-		cacti_log('ERROR: Invalid format file path rejected: ' . json_encode($format_file), false, 'REPORTS');
-
-		return false;
-	}
-
-	$format_file = $validated;
+	$format_file = CACTI_PATH_FORMATS . '/' . $format_file;
 
 	if (file_exists($format_file) && is_readable($format_file)) {
 		$contents = file($format_file);
 	}
 
 	$output = '';
-	$report_tag_included = false;
 
 	if (cacti_sizeof($contents)) {
-		foreach($contents as $line) {
+		foreach ($contents as $line) {
 			$line = trim($line);
+
 			if (substr_count($line, '<REPORT>')) {
-				$report_tag_included = true;
+				$report_tag = true;
 			}
 
-			if (substr($line, 0, 1) != '#') {
+			if (!str_starts_with($line, '#')) {
 				$output .= $line . PHP_EOL;
-			} elseif (strstr($line, 'Theme:') !== false) {
+			} elseif (str_contains($line, 'Theme:')) {
 				$tparts = explode(':', $line);
 				$theme  = trim($tparts[1]);
 			}
@@ -667,30 +725,31 @@ function reports_load_format_file($format_file, &$output, &$report_tag_included,
 
 /**
  * determine, if the given tree has graphs; taking permissions into account
- * @param int $tree_id			- tree id
- * @param int $branch_id		- branch id
- * @param int $effective_user	- user id
- * @param string $search_key	- search key
+ *
+ * @param int    $tree_id        The tree id
+ * @param int    $branch_id      The branch id
+ * @param int    $effective_user The user id
+ * @param string $search_key     The search key
+ *
+ * @return int
  */
-function reports_tree_has_graphs($tree_id, $branch_id, $effective_user, $search_key) {
-	global $config;
-
-	include_once($config['library_path'] . '/html_tree.php');
+function reports_tree_has_graphs(int $tree_id,int  $branch_id,int  $effective_user,string $search_key) : int {
+	include_once(CACTI_PATH_LIBRARY . '/html_tree.php');
 
 	$sql_where  = '';
 	$sql_swhere = '';
-	$graphs     = array();
-	$new_graphs = array();
+	$graphs     = [];
+	$new_graphs = [];
 
 	if ($search_key != '') {
-		$sql_swhere = ' AND gtg.title_cache ' . db_qstr_rlike($search_key);
+		$sql_swhere = ' AND gtg.title_cache REGEXP ' . db_qstr($search_key);
 	}
 
 	$device_id = db_fetch_cell_prepared('SELECT host_id
 		FROM graph_tree_items
 		WHERE id = ?
 		AND graph_tree_id = ?',
-		array($branch_id, $tree_id));
+		[$branch_id, $tree_id]);
 
 	if ($device_id > 0) {
 		$graphs = array_rekey(db_fetch_assoc("SELECT gl.id
@@ -717,7 +776,7 @@ function reports_tree_has_graphs($tree_id, $branch_id, $effective_user, $search_
 			$sql_where
 			$sql_swhere"), 'id', 'id');
 
-		/* get host graphs first */
+		// get host graphs first
 		$graphs = array_merge($graphs, array_rekey(db_fetch_assoc("SELECT gl.id
 			FROM graph_local AS gl
 			INNER JOIN graph_tree_items AS gti
@@ -730,9 +789,9 @@ function reports_tree_has_graphs($tree_id, $branch_id, $effective_user, $search_
 			$sql_swhere"), 'id', 'id'));
 	}
 
-	/* verify permissions */
+	// verify permissions
 	if (cacti_sizeof($graphs)) {
-		foreach($graphs as $key => $id) {
+		foreach ($graphs as $key => $id) {
 			if (!is_graph_allowed($id, $effective_user)) {
 				unset($graphs[$key]);
 			}
@@ -742,55 +801,145 @@ function reports_tree_has_graphs($tree_id, $branch_id, $effective_user, $search_
 	return cacti_sizeof($graphs);
 }
 
+function reports_generate_history_html(int $history_id, int $output = REPORTS_OUTPUT_STDOUT) : string {
+	$data   = db_fetch_row_prepared('SELECT *
+		FROM reports_log
+		WHERE id = ?',
+		[$history_id]);
 
-/** reports_generate_html  print report to html for online verification
- * @param int $reports_id	- id of report report
- * @param int $output		- type of output
- * @return string			- generated html output
+	if (cacti_sizeof($data)) {
+		$oreport = db_fetch_row_prepared('SELECT *
+			FROM reports
+			WHERE id = ?',
+			[$data['source_id']]);
+
+		// here is the report html as sent to the user
+		$report = $data['report_html_output'];
+
+		// strip out the css/format if selected
+		if (grv('style') == 'false') {
+			$instyle  = false;
+			$pinstyle = null;
+			$nreport  = '';
+			$lines    = explode("\n", $report);
+
+			foreach ($lines as $l) {
+				if (str_contains($l, '<style')) {
+					$instyle = true;
+				} elseif (str_contains($l, '</style>')) {
+					$instyle = false;
+				}
+
+				if (($pinstyle === null && !$instyle) || $pinstyle === false) {
+					$nreport .= $l . PHP_EOL;
+				}
+
+				$pinstyle = $instyle;
+			}
+
+			$report = $nreport;
+		}
+
+		// make generic style changes to match Cacti when not showing with style
+		if (grv('style') == 'false') {
+			$report = str_replace('report_table', 'cactiTable', $report);
+			$report = str_replace('title_row', 'cactiTableTitleRow', $report);
+			$report = str_replace('text_row', 'cactiTableTitleRow', $report);
+			$report = str_replace('text', 'center', $report);
+			$report = str_replace('title', 'center', $report);
+			$report = str_replace('image_table', 'cactiTable', $report);
+			$report = str_replace('image_row', 'tableRow', $report);
+			$report = str_replace('image_column\'', 'image_column\' style=\'text-align:center;\'', $report);
+			$report = str_replace('image_column"', 'image_column" style="text-align:center;"', $report);
+			$report = str_replace('<table>', '<table class="cactiTable">', $report);
+		}
+
+		$graph_data = json_decode(base64_decode($data['report_attachments'], true), true);
+
+		foreach ($graph_data as $graph) {
+			$report = str_replace('<GRAPH:' . $graph['local_graph_id'] . ':' . $graph['timespan'] . '>',
+				'<img class="graph" src="data:image/png;base64,' . $graph['attachment'] . '">', $report);
+		}
+
+		return $report;
+	}
+
+	return '';
+}
+
+function reports_remove_history(int $history_id, int $report_id = 0) : void {
+	if ($report_id == 0) {
+		$report_id = db_fetch_cell_prepared('SELECT source_id FROM reports_log WHERE id = ?', [$history_id]);
+	}
+
+	$report = db_fetch_row_prepared('SELECT * FROM reports WHERE id = ?', [$report_id]);
+
+	if (is_reports_admin() || $report['user_id'] == SESS_USER_ID) {
+		db_execute_prepared('DELETE FROM reports_log WHERE id = ?', [$history_id]);
+
+		raise_message('remove_message', __('Report \'%s\' History Removed by user \'%s\' or a Report Administrator can remove the report.', $report['name'], get_username($_SESSION[SESS_USER_ID])), MESSAGE_LEVEL_INFO);
+	} else {
+		raise_message('remove_error', __('Only the owning user \'%s\' or a Report Administrator can remove the report.', get_username($_SESSION[SESS_USER_ID])), MESSAGE_LEVEL_ERROR);
+	}
+}
+
+/**
+ * reports_generate_html  print report to html for online verification
+ *
+ * @param int    $reports_id Id of report report
+ * @param int    $output     Type of output
+ * @param string $theme      The format of the output
+ *
+ * @return string generated html output
  */
-function reports_generate_html($reports_id, $output = REPORTS_OUTPUT_STDOUT, &$theme = '') {
-	global $config;
+function reports_generate_html(int $reports_id, int $output = REPORTS_OUTPUT_STDOUT, string &$theme = '') : string {
 	global $alignment;
 
-	include_once($config['base_path'] . '/lib/time.php');
+	include_once(CACTI_PATH_LIBRARY . '/time.php');
 
 	$outstr = '';
 	$report = db_fetch_row_prepared('SELECT *
 		FROM reports
 		WHERE id = ?',
-		array($reports_id));
+		[$reports_id]);
 
 	$reports_items = db_fetch_assoc_prepared('SELECT *
 		FROM reports_items
 		WHERE report_id = ?
 		ORDER BY sequence',
-		array($report['id']));
+		[$report['id']]);
 
 	$format_data = '';
 	$report_tag  = false;
 	$format_ok   = false;
 
 	if ($theme == '') {
-		$theme = 'classic';
+		$theme = 'modern';
 	}
 
 	$time = time();
-	# get config option for first-day-of-the-week
+	// get config option for first-day-of-the-week
 	$first_weekdayid = read_user_setting('first_weekdayid');
 
-	/* process the format file as applicable */
-	if ($report['cformat'] == 'on') {
-		$format_ok = reports_load_format_file($report['format_file'], $format_data, $report_tag, $theme);
+	// process the format file as applicable
+	if (!isrv('style') || grv('style') == 'true') {
+		if ($report['cformat'] == 'on') {
+			$format_ok = reports_load_format_file($report['format_file'], $format_data, $report_tag, $theme);
+		}
+
+		if ($output == REPORTS_OUTPUT_STDOUT) {
+			$format_data = str_replace('<html>', '', $format_data);
+			$format_data = str_replace('</html>', '', $format_data);
+			$format_data = str_replace('<body>', '', $format_data);
+			$format_data = str_replace('</body>', '', $format_data);
+			$format_data = preg_replace('#(<head>).*?(</head>)#si', '', $format_data);
+			$format_data = str_replace('<head>', '', $format_data);
+			$format_data = str_replace('</head>', '', $format_data);
+		}
 	}
 
-	if ($output == REPORTS_OUTPUT_STDOUT) {
-		$format_data = str_replace('<html>', '', $format_data);
-		$format_data = str_replace('</html>', '', $format_data);
-		$format_data = str_replace('<body>', '', $format_data);
-		$format_data = str_replace('</body>', '', $format_data);
-		$format_data = preg_replace('#(<head>).*?(</head>)#si', '', $format_data);
-		$format_data = str_replace('<head>', '', $format_data);
-		$format_data = str_replace('</head>', '', $format_data);
+	if (grv('style') == 'false') {
+		$format_ok = true;
 	}
 
 	if ($format_ok && $report_tag) {
@@ -803,13 +952,13 @@ function reports_generate_html($reports_id, $output = REPORTS_OUTPUT_STDOUT, &$t
 
 	if (cacti_sizeof($reports_items)) {
 		if ($output == REPORTS_OUTPUT_EMAIL && $include_body) {
-			$outstr .= "<body>" . PHP_EOL;
+			$outstr .= '<body>' . PHP_EOL;
 		}
 
 		if ($format_ok) {
 			$outstr .= "\t<table class='report_table'>" . PHP_EOL;
 		} else {
-			$outstr .= "\t<table class='report_table' " . ($output == REPORTS_OUTPUT_STDOUT ? "style='background-color:#F9F9F9;'":'') . ">" . PHP_EOL;
+			$outstr .= "\t<table class='report_table' " . ($output == REPORTS_OUTPUT_STDOUT ? "style='background-color:#F9F9F9;'" : '') . '>' . PHP_EOL;
 		}
 
 		$outstr .= "\t\t<tr class='title_row'>" . PHP_EOL;
@@ -817,34 +966,36 @@ function reports_generate_html($reports_id, $output = REPORTS_OUTPUT_STDOUT, &$t
 		if ($format_ok) {
 			$outstr .= "\t\t\t<td class='title'>" . PHP_EOL;
 		} else {
-			$outstr .= "\t\t\t<td class='title' style='text-align:" . $alignment[$report['alignment']] . ";font-size:" . $report['font_size'] . "pt;'>" . PHP_EOL;
+			$outstr .= "\t\t\t<td class='title' style='text-align:" . $alignment[$report['alignment']] . ';font-size:' . $report['font_size'] . "pt;'>" . PHP_EOL;
 		}
 
-		$outstr .= "\t\t\t\t" . html_escape($report['name']) . PHP_EOL;
+		$outstr .= "\t\t\t\t<h3>" . htmle($report['name']) . '</h3>' . PHP_EOL;
 		$outstr .= "\t\t\t</td>" . PHP_EOL;
 		$outstr .= "\t\t</tr>" . PHP_EOL;
-		# this function should be called only at the appropriate targeted time when in batch mode
-		# but for preview mode we can't use the targeted time
-		# so let's use time()
+		// this function should be called only at the appropriate targeted time when in batch mode
+		// but for preview mode we can't use the targeted time
+		// so let's use time()
 		$time = time();
-		# get config option for first-day-of-the-week
+		// get config option for first-day-of-the-week
 		$first_weekdayid = read_user_setting('first_weekdayid');
 
-		/* don't cache previews */
+		// don't cache previews
 		$_SESSION['custom'] = 'true';
 
 		$column = 0;
-		foreach($reports_items as $item) {
+
+		foreach ($reports_items as $item) {
 			reports_log(__FUNCTION__ . ', item_id: ' . $item['id'] . ' local_graph_id: ' . $item['local_graph_id'], false, 'REPORTS TRACE', POLLER_VERBOSITY_MEDIUM);
 
 			if ($item['item_type'] == REPORTS_ITEM_GRAPH) {
 				if (is_graph_allowed($item['local_graph_id'], $report['user_id'])) {
-					$timespan = array();
-					# get start/end time-since-epoch for actual time (now()) and given current-session-timespan
+					$timespan = [];
+					// get start/end time-since-epoch for actual time (now()) and given current-session-timespan
 					get_timespan($timespan, $time, $item['timespan'], $first_weekdayid);
 
 					if ($column == 0) {
 						$outstr .= "\t\t<tr class='image_row'>" . PHP_EOL;
+
 						if ($format_ok) {
 							$outstr .= "\t\t\t<td>" . PHP_EOL;
 						} else {
@@ -886,14 +1037,14 @@ function reports_generate_html($reports_id, $output = REPORTS_OUTPUT_STDOUT, &$t
 				if ($format_ok) {
 					$outstr .= "\t\t\t<td class='text'>" . PHP_EOL;
 				} else {
-					$outstr .= "\t\t\t<td style='text-align:" . $alignment[$item['align']] . ";font-size: " . $item['font_size'] . "pt;' class='text'>" . PHP_EOL;
+					$outstr .= "\t\t\t<td style='text-align:" . $alignment[$item['align']] . ';font-size: ' . $item['font_size'] . "pt;' class='text'>" . PHP_EOL;
 				}
 
-				$outstr .= "\t\t\t\t" . html_escape($item['item_text']) . PHP_EOL;
+				$outstr .= "\t\t\t\t" . htmle($item['item_text']) . PHP_EOL;
 				$outstr .= "\t\t\t</td>" . PHP_EOL;
 				$outstr .= "\t\t</tr>" . PHP_EOL;
 
-				/* start a new section */
+				// start a new section
 				$column = 0;
 			} elseif ($item['item_type'] == REPORTS_ITEM_HOST) {
 				if (is_tree_allowed($item['host_id'], $report['user_id'])) {
@@ -919,6 +1070,19 @@ function reports_generate_html($reports_id, $output = REPORTS_OUTPUT_STDOUT, &$t
 		}
 	}
 
+	if (grv('style') == 'false') {
+		$outstr = str_replace('report_table', 'cactiTable', $outstr);
+		$outstr = str_replace('title_row', 'cactiTableTitleRow', $outstr);
+		$outstr = str_replace('text_row', 'cactiTableTitleRow', $outstr);
+		$outstr = str_replace('text', 'center', $outstr);
+		$outstr = str_replace('title', 'center', $outstr);
+		$outstr = str_replace('image_table', 'cactiTable', $outstr);
+		$outstr = str_replace('image_row', 'tableRow', $outstr);
+		$outstr = str_replace('image_column\'', 'image_column\' style=\'text-align:center;\'', $outstr);
+		$outstr = str_replace('image_column"', 'image_column" style="text-align:center;"', $outstr);
+		$outstr = str_replace('<table>', '<table class="cactiTable">', $outstr);
+	}
+
 	if ($format_ok) {
 		if ($report_tag) {
 			return str_replace('<REPORT>', $outstr, $format_data);
@@ -930,7 +1094,7 @@ function reports_generate_html($reports_id, $output = REPORTS_OUTPUT_STDOUT, &$t
 	}
 }
 
-function expand_branch(&$report, &$item, $branch_id, $output, $format_ok, $theme = 'classic') {
+function expand_branch(array &$report, array &$item, int $branch_id, int $output = REPORTS_OUTPUT_STDOUT, bool $format_ok = false, string $theme = 'modern') : string {
 	$outstr = '';
 
 	if (reports_tree_has_graphs($item['tree_id'], $branch_id, $report['user_id'], $item['graph_name_regexp'])) {
@@ -943,7 +1107,7 @@ function expand_branch(&$report, &$item, $branch_id, $output, $format_ok, $theme
 		AND host_id = 0
 		AND local_graph_id = 0
 		AND graph_tree_id = ?
-		ORDER BY position', array($branch_id, $item['tree_id']));
+		ORDER BY position', [$branch_id, $item['tree_id']]);
 
 	if (cacti_sizeof($tree_branches)) {
 		foreach ($tree_branches as $branch) {
@@ -956,21 +1120,23 @@ function expand_branch(&$report, &$item, $branch_id, $output, $format_ok, $theme
 
 /**
  * return html code for an embedded image
- * @param array $report	- parameters for this report mail report
- * @param $item			- current graph item
- * @param $timespan		- timespan
- * @param $output		- type of output
- * @return string		- generated html
+ *
+ * @param array $report   Parameters for this report mail report
+ * @param array $item     Current graph item
+ * @param array $timespan Timespan
+ * @param int   $output   Type of output
+ * @param mixed $theme    The theme to render with
+ *
+ * @return string generated html
  */
- function reports_graph_image($report, $item, $timespan, $output, $theme = 'classic') {
- 	global $config;
-
+function reports_graph_image($report, $item, $timespan, $output = REPORTS_OUTPUT_STDOUT, $theme = 'modern') {
 	$out = '';
+
 	if ($output == REPORTS_OUTPUT_STDOUT) {
-		$out = "<img class='image' alt='' src='" . html_escape($config['url_path'] . 'graph_image.php' .
+		$out = "<img class='image' alt='' src='" . htmle(CACTI_PATH_URL . 'graph_image.php' .
 			'?graph_width=' . $report['graph_width'] .
 			'&graph_height=' . $report['graph_height'] .
-			($report['thumbnails'] == 'on' ? '&graph_nolegend=true':'') .
+			($report['thumbnails'] == 'on' ? '&graph_nolegend=true' : '') .
 			'&local_graph_id=' . $item['local_graph_id'] .
 			'&graph_start=' . $timespan['begin_now'] .
 			'&graph_end=' . $timespan['end_now'] .
@@ -981,8 +1147,8 @@ function expand_branch(&$report, &$item, $branch_id, $output, $format_ok, $theme
 		$out = '<GRAPH:' . $item['local_graph_id'] . ':' . $item['timespan'] . '>';
 	}
 
-	if ($report['graph_linked'] == 'on' ) {
-		if (substr(read_config_option('base_url'), 0, 4) != 'http') {
+	if ($report['graph_linked'] == 'on') {
+		if (!str_starts_with(read_config_option('base_url'), 'http')) {
 			if (read_config_option('force_https') == 'on') {
 				$prefix = 'https://';
 			} else {
@@ -992,7 +1158,7 @@ function expand_branch(&$report, &$item, $branch_id, $output, $format_ok, $theme
 			set_config_option('base_url', $prefix . read_config_option('base_url'));
 		}
 
-		$out = "<a href='" . html_escape(read_config_option('base_url', true) . '/graph.php?action=view&local_graph_id=' . $item['local_graph_id'] . "&rra_id=0") . "'>" . $out . '</a>';
+		$out = "<a href='" . htmle(read_config_option('base_url', true) . '/graph.php?action=view&local_graph_id=' . $item['local_graph_id'] . '&rra_id=0') . "'>" . $out . '</a>';
 	}
 
 	return $out . PHP_EOL;
@@ -1001,49 +1167,51 @@ function expand_branch(&$report, &$item, $branch_id, $output, $format_ok, $theme
 /**
  * expand a device for including into report
  *
- * @param array $report		- parameters for this report mail report
- * @param int $item			- current graph item
- * @param int $device_id    - the id of the host to include
- * @param int $output		- type of output
- * @param bool $format_ok	- use css styling
+ * @param array $report    Parameters for this report mail report
+ * @param array $item      Current graph item
+ * @param int   $device_id The id of the host to include
+ * @param int   $output    Type of output
+ * @param bool  $format_ok Use css styling
+ * @param mixed $theme     The theme to use for output
  *
- * @return string			- html
+ * @return string html
  */
-function reports_expand_device(&$report, $item, $device_id, $output, $format_ok, $theme = 'classic') {
-	global $config, $alignment;
+function reports_expand_device(array &$report, array $item, int $device_id, int $output = REPORTS_OUTPUT_STDOUT, bool $format_ok = false, mixed $theme = 'modern') : string {
+	global $alignment;
 
-	include($config['include_path'] . '/global_arrays.php');
-	include_once($config['library_path'] . '/data_query.php');
-	include_once($config['library_path'] . '/html_tree.php');
-	include_once($config['library_path'] . '/html_utility.php');
+	include(CACTI_PATH_INCLUDE . '/global_arrays.php');
+	include_once(CACTI_PATH_LIBRARY . '/data_query.php');
+	include_once(CACTI_PATH_LIBRARY . '/html_tree.php');
+	include_once(CACTI_PATH_LIBRARY . '/html_utility.php');
 
 	$time = time();
 
-	# get config option for first-day-of-the-week
+	// get config option for first-day-of-the-week
 	$first_weekdayid = read_user_setting('first_weekdayid');
 
 	$user = $report['user_id'];
 
-	$timespan = array();
+	$timespan = [];
 
-	# get start/end time-since-epoch for actual time (now()) and given current-session-timespan
+	// get start/end time-since-epoch for actual time (now()) and given current-session-timespan
 	get_timespan($timespan, $time, $item['timespan'], $first_weekdayid);
 
 	$outstr = '';
 
-	$graphs = array();
+	$graphs = [];
 
 	$sql_where       = '';
 	$title_delimiter = '';
 	$search_key      = '';
+	$title           = '';
 
 	$description = db_fetch_cell_prepared('SELECT h.description
 		FROM host AS h
 		WHERE h.id = ?',
-		array($device_id));
+		[$device_id]);
 
 	if ($description != '') {
-		$title = $title_delimiter . __('Device:') . " " . html_escape($description);
+		$title           = $title_delimiter . __('Device:') . ' ' . htmle($description);
 		$title_delimiter = ' > ';
 	}
 
@@ -1058,16 +1226,16 @@ function reports_expand_device(&$report, $item, $device_id, $output, $format_ok,
 				ON gtg.local_graph_id=gl.id
 				WHERE gl.host_id = ?
 				ORDER BY gt.name',
-				array($device_id)),
+				[$device_id]),
 			'id', 'name'
 		);
 
-		/* for graphs without a template */
+		// for graphs without a template
 		array_push($graph_templates,
-			array(
-				'id' => '0',
+			[
+				'id'   => '0',
 				'name' => __('(No Graph Template)')
-			)
+			]
 		);
 	} else {
 		$graph_templates = array_rekey(
@@ -1076,24 +1244,25 @@ function reports_expand_device(&$report, $item, $device_id, $output, $format_ok,
 				FROM graph_templates AS gt
 				WHERE id = ?
 				ORDER BY gt.name',
-				array($item['graph_template_id'])),
+				[$item['graph_template_id']]),
 			'id', 'name'
 		);
 	}
 
 	if (cacti_sizeof($graph_templates)) {
-		foreach($graph_templates AS $id => $name) {
+		foreach ($graph_templates as $id => $name) {
 			if (!is_graph_template_allowed($id, $user)) {
 				unset($graph_templates[$id]);
 			}
 		}
 	}
 
-	$outgraphs = array();
+	$outgraphs = [];
+
 	if (cacti_sizeof($graph_templates)) {
 		foreach ($graph_templates as $id => $name) {
 			if ($item['graph_name_regexp'] != '') {
-				$sql_where .= ' AND title_cache ' . db_qstr_rlike($item['graph_name_regexp']);
+				$sql_where .= ' AND title_cache REGEXP ' . db_qstr($item['graph_name_regexp']);
 			}
 
 			$graphs = db_fetch_assoc_prepared("SELECT
@@ -1105,10 +1274,10 @@ function reports_expand_device(&$report, $item, $device_id, $output, $format_ok,
 				AND gl.host_id = ?
 				$sql_where
 				ORDER BY gtg.title_cache",
-				array($id, $device_id));
+				[$id, $device_id]);
 
 			if (cacti_sizeof($graphs)) {
-				foreach($graphs as $key => $graph) {
+				foreach ($graphs as $key => $graph) {
 					if (!is_graph_allowed($graph['local_graph_id'], $user)) {
 						unset($graphs[$key]);
 					}
@@ -1119,20 +1288,20 @@ function reports_expand_device(&$report, $item, $device_id, $output, $format_ok,
 		}
 
 		if (cacti_sizeof($outgraphs)) {
-			/* let's sort the graphs naturally */
+			// let's sort the graphs naturally
 			usort($outgraphs, 'necturally_sort_graphs');
 
-			/* start graph display */
+			// start graph display
 			if ($title != '') {
 				$outstr .= "\t\t<tr class='text_row'>" . PHP_EOL;
 
 				if ($format_ok) {
 					$outstr .= "\t\t\t<td class='text'>" . PHP_EOL;
 				} else {
-					$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ";font-size: " . $item['font_size'] . "pt;'>" . PHP_EOL;
+					$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ';font-size: ' . $item['font_size'] . "pt;'>" . PHP_EOL;
 				}
 
-				$outstr .= "\t\t\t\t$title" . PHP_EOL;
+				$outstr .= "\t\t\t\t<h3>$title</h3>" . PHP_EOL;
 				$outstr .= "\t\t\t</td>" . PHP_EOL;
 				$outstr .= "\t\t</tr>" . PHP_EOL;
 			}
@@ -1147,45 +1316,46 @@ function reports_expand_device(&$report, $item, $device_id, $output, $format_ok,
 /**
  * expand a tree for including into report
  *
- * @param array $report		- parameters for this report mail report
- * @param int $item			- current graph item
- * @param int $output		- type of output
- * @param bool $format_ok	- use css styling
- * @param bool $nested		- nested tree?
+ * @param array $report    Parameters for this report mail report
+ * @param array $item      Current graph item
+ * @param int   $parent    The tree parent
+ * @param int   $output    The type of output
+ * @param bool  $format_ok Use css styling
+ * @param bool  $nested    Nested tree?
  *
- * @return string			- html
+ * @return string html
  */
-function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $theme = 'classic', $nested = false) {
-	global $config, $alignment;
+function reports_expand_tree(array &$report, array $item, int $parent, int $output, bool $format_ok, string $theme = 'modern', bool $nested = false) : string {
+	global $alignment;
 
-	include($config['include_path'] . '/global_arrays.php');
-	include_once($config['library_path'] . '/data_query.php');
-	include_once($config['library_path'] . '/html_tree.php');
-	include_once($config['library_path'] . '/html_utility.php');
+	include(CACTI_PATH_INCLUDE . '/global_arrays.php');
+	include_once(CACTI_PATH_LIBRARY . '/data_query.php');
+	include_once(CACTI_PATH_LIBRARY . '/html_tree.php');
+	include_once(CACTI_PATH_LIBRARY . '/html_utility.php');
 
 	$tree_id = $item['tree_id'];
 	$leaf_id = $item['branch_id'];
 
 	$time = time();
-	# get config option for first-day-of-the-week
+	// get config option for first-day-of-the-week
 	$first_weekdayid = read_user_setting('first_weekdayid');
 
 	$user = $report['user_id'];
 
-	$timespan = array();
+	$timespan = [];
 
-	# get start/end time-since-epoch for actual time (now()) and given current-session-timespan
+	// get start/end time-since-epoch for actual time (now()) and given current-session-timespan
 	get_timespan($timespan, $time, $item['timespan'], $first_weekdayid);
 
 	if (empty($tree_id)) {
-		return;
+		return '';
 	}
 
 	$device_id = db_fetch_cell_prepared('SELECT host_id
 		FROM graph_tree_items
 		WHERE id = ?
 		AND graph_tree_id = ?',
-		array($parent, $tree_id));
+		[$parent, $tree_id]);
 
 	$outstr = '';
 
@@ -1195,19 +1365,20 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 			WHERE graph_tree_id = ?
 			AND parent = ?
 			ORDER BY position',
-			array($tree_id, $parent));
+			[$tree_id, $parent]);
 	} elseif (is_device_allowed($device_id, $user)) {
 		$leaves = db_fetch_assoc_prepared('SELECT *
 			FROM graph_tree_items
 			WHERE graph_tree_id = ?
 			AND id = ?
 			ORDER BY position',
-			array($tree_id, $parent));
-	} else{
-		$leaves = array();
+			[$tree_id, $parent]);
+	} else {
+		$leaves = [];
 	}
 
-	$graphs = array();
+	$graphs = [];
+	$title  = '';
 
 	if (cacti_sizeof($leaves)) {
 		foreach ($leaves as $leaf) {
@@ -1231,19 +1402,17 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 				$leaf_type = 'header';
 			}
 
-			/* get information for the headers */
-			if (!empty($tree_id)) {
-				$tree_name = db_fetch_cell_prepared('SELECT name
-					FROM graph_tree
-					WHERE id = ?',
-					array($tree_id));
-			}
+			// get information for the headers
+			$tree_name = db_fetch_cell_prepared('SELECT name
+				FROM graph_tree
+				WHERE id = ?',
+				[$tree_id]);
 
 			if (!empty($parent)) {
 				$leaf_name = db_fetch_cell_prepared('SELECT title
 					FROM graph_tree_items
 					WHERE id = ?',
-					array($parent));
+					[$parent]);
 			}
 
 			if (!empty($leaf_id)) {
@@ -1252,7 +1421,7 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 					INNER JOIN host AS h
 					ON h.id = gti.host_id
 					WHERE gti.id = ?',
-					array($leaf_id));
+					[$leaf_id]);
 			}
 
 			if ($leaf_type == 'graph') {
@@ -1260,35 +1429,35 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 					gtg.title_cache AS title
 					FROM graph_templates_graph AS gtg
 					WHERE gtg.local_graph_id = ?',
-					array($leaf['local_graph_id']));
+					[$leaf['local_graph_id']]);
 			}
 
 			if (!empty($tree_name) && empty($leaf_name) && empty($host_name)) {
-				$title = $title_delimiter . __('Tree:') . ' ' . html_escape($tree_name);
+				$title           = $title_delimiter . __('Tree:') . " $tree_name";
 				$title_delimiter = ' > ';
 			}
 
 			if (!empty($leaf_name)) {
-				$title .= $title_delimiter . ' ' . html_escape($leaf_name);
+				$title .= $title_delimiter . " $leaf_name";
 				$title_delimiter = ' > ';
 			}
 
 			if (!empty($host_name)) {
-				$title .= $title_delimiter . ' ' . html_escape($host_name);
+				$title .= $title_delimiter . " $host_name";
 				$title_delimiter = ' > ';
 			}
 
 			if (!empty($graph_name) && !$nested) {
-				$title .= $title_delimiter . ' ' . html_escape($graph_name);
+				$title .= $title_delimiter . " $graph_name";
 				$title_delimiter = ' > ';
 			}
 
 			if ($item['graph_name_regexp'] != '') {
-				$sql_where .= ' AND title_cache ' . db_qstr_rlike($item['graph_name_regexp']);
+				$sql_where .= ' AND title_cache REGEXP ' . db_qstr($item['graph_name_regexp']);
 			}
 
 			if ($leaf_type == 'header' && $nested) {
-				$mygraphs = array();
+				$mygraphs = [];
 
 				$graphs = db_fetch_assoc("SELECT DISTINCT
 					gti.local_graph_id, gtg.title_cache
@@ -1303,22 +1472,23 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 					$sql_where
 					ORDER BY gti.position");
 
-				foreach($graphs as $key => $graph) {
+				foreach ($graphs as $graph) {
 					if (is_graph_allowed($graph['local_graph_id'], $user)) {
 						$mygraphs[$graph['local_graph_id']] = $graph;
 					}
 				}
 
 				if (cacti_sizeof($mygraphs)) {
-					/* start graph display */
+					// start graph display
 					if ($title != '') {
 						$outstr .= "\t\t<tr class='text_row'>" . PHP_EOL;
+
 						if ($format_ok) {
 							$outstr .= "\t\t\t<td class='text'>" . PHP_EOL;
 						} else {
-							$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ";font-size: " . $item['font_size'] . "pt;'>" . PHP_EOL;
+							$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ';font-size: ' . $item['font_size'] . "pt;'>" . PHP_EOL;
 						}
-						$outstr .= "\t\t\t\t$title" . PHP_EOL;
+						$outstr .= "\t\t\t\t<h3>$title</h3>" . PHP_EOL;
 						$outstr .= "\t\t\t</td>" . PHP_EOL;
 						$outstr .= "\t\t</tr>" . PHP_EOL;
 					}
@@ -1327,13 +1497,14 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 				}
 			} elseif ($leaf_type == 'graph' && $nested) {
 				$gr_where = '';
+
 				if ($item['graph_name_regexp'] != '') {
-					$gr_where .= ' AND title_cache ' . db_qstr_rlike($item['graph_name_regexp']);
+					$gr_where .= ' AND title_cache REGEXP ' . db_qstr($item['graph_name_regexp']);
 				}
 
-				$graph = db_fetch_row("SELECT local_graph_id, title_cache
+				$graph = db_fetch_row('SELECT local_graph_id, title_cache
 					FROM graph_templates_graph
-					WHERE local_graph_id=" . $leaf['local_graph_id'] . $gr_where);
+					WHERE local_graph_id=' . $leaf['local_graph_id'] . $gr_where);
 
 				if (cacti_sizeof($graph)) {
 					if (is_graph_allowed($graph['local_graph_id'], $user)) {
@@ -1342,35 +1513,37 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 				}
 			} elseif ($leaf_type == 'graph') {
 				$gr_where = '';
+
 				if ($item['graph_name_regexp'] != '') {
-					$gr_where .= ' AND title_cache ' . db_qstr_rlike($item['graph_name_regexp']);
+					$gr_where .= ' AND title_cache REGEXP ' . db_qstr($item['graph_name_regexp']);
 				}
 
-				$graph = db_fetch_cell("SELECT count(*)
+				$graph = db_fetch_cell('SELECT count(*)
 					FROM graph_templates_graph
-					WHERE local_graph_id=" . $leaf['local_graph_id'] . $gr_where);
+					WHERE local_graph_id=' . $leaf['local_graph_id'] . $gr_where);
 
-				/* start graph display */
+				// start graph display
 				if ($graph > 0) {
 					if ($title != '') {
 						$outstr .= "\t\t<tr class='text_row'>" . PHP_EOL;
+
 						if ($format_ok) {
 							$outstr .= "\t\t\t<td class='text'>" . PHP_EOL;
 						} else {
-							$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ";font-size: " . $item['font_size'] . "pt;'>" . PHP_EOL;
+							$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ';font-size: ' . $item['font_size'] . "pt;'>" . PHP_EOL;
 						}
-						$outstr .= "\t\t\t\t$title" . PHP_EOL;
+						$outstr .= "\t\t\t\t<h3>$title</h3>" . PHP_EOL;
 						$outstr .= "\t\t\t</td>" . PHP_EOL;
 						$outstr .= "\t\t</tr>" . PHP_EOL;
 					}
 				}
 
-				$graph_list = array(array('local_graph_id' => $leaf['local_graph_id'], 'title_cache' => $graph_name));
+				$graph_list = [['local_graph_id' => $leaf['local_graph_id'], 'title_cache' => $graph_name]];
 
 				$outstr .= reports_graph_area($graph_list, $report, $item, $timespan, $output, $format_ok, $theme);
 			} elseif ($leaf_type == 'host') {
 				if ($item['tree_cascade'] == 'on') {
-					/* graph template grouping */
+					// graph template grouping
 					if ($leaf['host_grouping_type'] == HOST_GROUPING_GRAPH_TEMPLATE) {
 						$graph_templates = array_rekey(
 							db_fetch_assoc_prepared('SELECT DISTINCT
@@ -1382,27 +1555,28 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 								ON gtg.local_graph_id=gl.id
 								WHERE gl.host_id = ?
 								ORDER BY gt.name',
-								array($leaf['host_id'])),
+								[$leaf['host_id']]),
 							'id', 'name'
 						);
 
 						if (cacti_sizeof($graph_templates)) {
-							foreach($graph_templates AS $id => $name) {
+							foreach ($graph_templates as $id => $name) {
 								if (!is_graph_template_allowed($id, $user)) {
 									unset($graph_templates[$id]);
 								}
 							}
 						}
 
-						/* for graphs without a template */
+						// for graphs without a template
 						array_push($graph_templates,
-							array(
-								'id' => '0',
+							[
+								'id'   => '0',
 								'name' => __('(No Graph Template)')
-							)
+							]
 						);
 
-						$outgraphs = array();
+						$outgraphs = [];
+
 						if (cacti_sizeof($graph_templates)) {
 							foreach ($graph_templates as $id => $name) {
 								$graphs = db_fetch_assoc('SELECT
@@ -1416,30 +1590,31 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 									ORDER BY gtg.title_cache");
 
 								if (cacti_sizeof($graphs)) {
-									foreach($graphs as $key => $graph) {
+									foreach ($graphs as $key => $graph) {
 										if (!is_graph_allowed($graph['local_graph_id'], $user)) {
 											unset($graphs[$key]);
 										}
 									}
 								}
+
 								$outgraphs = array_merge($outgraphs, $graphs);
 							}
 
 							if (cacti_sizeof($outgraphs)) {
-								/* let's sort the graphs naturally */
-								usort($outgraphs, 'necturally_sort_graphs');
+								// let's sort the graphs naturally
+								usort($outgraphs, 'necturally_sort_graphs'); // @phpstan-ignore-line
 
-								/* start graph display */
+								// start graph display
 								if ($title != '') {
 									$outstr .= "\t\t<tr class='text_row'>" . PHP_EOL;
 
 									if ($format_ok) {
 										$outstr .= "\t\t\t<td class='text'>" . PHP_EOL;
 									} else {
-										$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ";font-size: " . $item['font_size'] . "pt;'>" . PHP_EOL;
+										$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ';font-size: ' . $item['font_size'] . "pt;'>" . PHP_EOL;
 									}
 
-									$outstr .= "\t\t\t\t$title" . PHP_EOL;
+									$outstr .= "\t\t\t\t<h3>$title</h3>" . PHP_EOL;
 									$outstr .= "\t\t\t</td>" . PHP_EOL;
 									$outstr .= "\t\t</tr>" . PHP_EOL;
 								}
@@ -1448,7 +1623,7 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 							}
 						}
 					} elseif ($leaf['host_grouping_type'] == HOST_GROUPING_DATA_QUERY_INDEX) {
-						/* data query index grouping */
+						// data query index grouping
 						$data_queries = db_fetch_assoc_prepared('SELECT DISTINCT
 							sq.id, sq.name
 							FROM graph_local AS gl
@@ -1456,25 +1631,26 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 							ON gl.snmp_query_id=sq.id
 							WHERE gl.host_id = ?
 							ORDER BY sq.name',
-							array($leaf['host_id']));
+							[$leaf['host_id']]);
 
-						/* for graphs without a data query */
+						// for graphs without a data query
 						if (empty($data_query_id)) {
 							array_push($data_queries,
-								array(
-									'id' => '0',
+								[
+									'id'   => '0',
 									'name' => __('(Non Query Based)')
-								)
+								]
 							);
 						}
 
 						$i = 0;
+
 						if (cacti_sizeof($data_queries)) {
 							foreach ($data_queries as $data_query) {
-								/* fetch a list of field names that are sorted by the preferred sort field */
+								// fetch a list of field names that are sorted by the preferred sort field
 								$sort_field_data = get_formatted_data_query_indexes($leaf['host_id'], $data_query['id']);
 
-								/* grab a list of all graphs for this host/data query combination */
+								// grab a list of all graphs for this host/data query combination
 								$graphs = db_fetch_assoc('SELECT
 									gtg.title_cache, gtg.local_graph_id, gl.snmp_index
 									FROM graph_local AS gl
@@ -1486,25 +1662,26 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 									ORDER BY gtg.title_cache");
 
 								if (cacti_sizeof($graphs)) {
-									foreach($graphs as $key => $graph) {
+									foreach ($graphs as $key => $graph) {
 										if (!is_graph_allowed($graph['local_graph_id'], $user)) {
 											unset($graphs[$key]);
 										}
 									}
 								}
 
-								/* re-key the results on data query index */
+								// re-key the results on data query index
 								if (cacti_sizeof($graphs)) {
 									if ($i == 0) {
-										/* start graph display */
+										// start graph display
 										if ($title != '') {
 											$outstr .= "\t\t<tr class='text_row'>" . PHP_EOL;
+
 											if ($format_ok) {
 												$outstr .= "\t\t\t<td class='text'>" . PHP_EOL;
 											} else {
-												$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ";font-size: " . $item['font_size'] . "pt;'>" . PHP_EOL;
+												$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ';font-size: ' . $item['font_size'] . "pt;'>" . PHP_EOL;
 											}
-											$outstr .= "\t\t\t\t$title" . PHP_EOL;
+											$outstr .= "\t\t\t\t<h3>$title</h3>" . PHP_EOL;
 											$outstr .= "\t\t\t</td>" . PHP_EOL;
 											$outstr .= "\t\t</tr>" . PHP_EOL;
 										}
@@ -1512,17 +1689,18 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 									$i++;
 
 									$outstr .= "\t\t<tr class='text_row'>" . PHP_EOL;
+
 									if ($format_ok) {
 										$outstr .= "\t\t\t<td class='text'>" . __('Data Query:') . ' ' . $data_query['name'] . PHP_EOL;
 										$outstr .= "\t\t\t</td>" . PHP_EOL;
 										$outstr .= "\t\t</tr>" . PHP_EOL;
 									} else {
-										$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ";font-size: " . $item['font_size'] . "pt;'>" . __('Data Query:') . ' ' . $data_query['name'] . PHP_EOL;
+										$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ';font-size: ' . $item['font_size'] . "pt;'>" . __('Data Query:') . ' ' . $data_query['name'] . PHP_EOL;
 										$outstr .= "\t\t\t</td>" . PHP_EOL;
 										$outstr .= "\t\t</tr>" . PHP_EOL;
 									}
 
-									/* let's sort the graphs naturally */
+									// let's sort the graphs naturally
 									usort($graphs, 'necturally_sort_graphs');
 
 									foreach ($graphs as $graph) {
@@ -1530,14 +1708,15 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 									}
 								}
 
-								/* using the sorted data as they key; grab each snmp index from the master list */
-								$graph_list = array();
+								// using the sorted data as they key; grab each snmp index from the master list
+								$graph_list = [];
+
 								foreach ($sort_field_data as $snmp_index => $sort_field_value) {
-									/* render each graph for the current data query index */
+									// render each graph for the current data query index
 									if (isset($snmp_index_to_graph[$snmp_index])) {
 										foreach ($snmp_index_to_graph[$snmp_index] as $local_graph_id => $graph_title) {
-											/* reformat the array so it's compatible with the html_graph* area functions */
-											array_push($graph_list, array('local_graph_id' => $local_graph_id, 'title_cache' => $graph_title));
+											// reformat the array so it's compatible with the html_graph* area functions
+											array_push($graph_list, ['local_graph_id' => $local_graph_id, 'title_cache' => $graph_title]);
 										}
 									}
 								}
@@ -1559,7 +1738,7 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 						ORDER BY gtg.title_cache");
 
 					if (cacti_sizeof($graphs)) {
-						foreach($graphs as $key => $graph) {
+						foreach ($graphs as $key => $graph) {
 							if (!is_graph_allowed($graph['local_graph_id'], $user)) {
 								unset($graphs[$key]);
 							}
@@ -1567,15 +1746,16 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 					}
 
 					if (cacti_sizeof($graphs)) {
-						/* start graph display */
+						// start graph display
 						if ($title != '') {
 							$outstr .= "\t\t<tr class='text_row'>" . PHP_EOL;
+
 							if ($format_ok) {
 								$outstr .= "\t\t\t<td class='text'>" . PHP_EOL;
 							} else {
-								$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ";font-size: " . $item['font_size'] . "pt;'>" . PHP_EOL;
+								$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ';font-size: ' . $item['font_size'] . "pt;'>" . PHP_EOL;
 							}
-							$outstr .= "\t\t\t\t$title" . PHP_EOL;
+							$outstr .= "\t\t\t\t<h3>$title</h3>" . PHP_EOL;
 							$outstr .= "\t\t\t</td>" . PHP_EOL;
 							$outstr .= "\t\t</tr>" . PHP_EOL;
 						}
@@ -1587,15 +1767,16 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 		}
 
 		if (cacti_sizeof($graphs)) {
-			/* start graph display */
+			// start graph display
 			if ($title != '') {
 				$outstr .= "\t\t<tr class='text_row'>" . PHP_EOL;
+
 				if ($format_ok) {
 					$outstr .= "\t\t\t<td class='text'>" . PHP_EOL;
 				} else {
-					$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ";font-size: " . $item['font_size'] . "pt;'>" . PHP_EOL;
+					$outstr .= "\t\t\t<td class='text' style='text-align:" . $alignment[$item['align']] . ';font-size: ' . $item['font_size'] . "pt;'>" . PHP_EOL;
 				}
-				$outstr .= "\t\t\t\t$title" . PHP_EOL;
+				$outstr .= "\t\t\t\t<h3>$title</h3>" . PHP_EOL;
 				$outstr .= "\t\t\t</td>" . PHP_EOL;
 				$outstr .= "\t\t</tr>" . PHP_EOL;
 			}
@@ -1609,33 +1790,37 @@ function reports_expand_tree(&$report, $item, $parent, $output, $format_ok, $the
 
 /**
  * natural sort function
- * @param $a
- * @param $b
- * @return string
+ *
+ * @param mixed $a The first string for sort
+ * @param mixed $b The second string for sort
+ *
+ * @return int The case comparison
  */
-function necturally_sort_graphs($a, $b) {
+function necturally_sort_graphs(mixed $a, mixed $b) : int {
 	return strnatcasecmp($a['title_cache'], $b['title_cache']);
 }
 
-
 /**
  * draw graph area
- * @param array $graphs		- array of graphs
- * @param array $report		- report parameters
- * @param int $item			- current item
- * @param int $timespan		- requested timespan
- * @param int $output		- type of output
- * @param bool $format_ok	- use css styling
+ *
+ * @param array  $graphs    Array of graphs
+ * @param array  $report    Report parameters
+ * @param array  $item      Current item
+ * @param array  $timespan  Requested timespan
+ * @param int    $output    Type of output
+ * @param bool   $format_ok Use css styling
+ * @param string $theme     The output format to use
+ *
  * @return string
  */
-function reports_graph_area($graphs, &$report, $item, $timespan, $output, $format_ok, $theme = 'classic') {
+function reports_graph_area(array $graphs, array &$report, array $item, array $timespan, int $output, bool $format_ok, string $theme = 'modern') : string {
 	global $alignment;
 
 	$outstr = '';
 	$column = 0;
 
 	if (cacti_sizeof($graphs)) {
-		foreach($graphs as $graph) {
+		foreach ($graphs as $graph) {
 			$item['local_graph_id'] = $graph['local_graph_id'];
 
 			if ($column == 0) {
@@ -1643,7 +1828,7 @@ function reports_graph_area($graphs, &$report, $item, $timespan, $output, $forma
 
 				if ($format_ok) {
 					$outstr .= "\t\t\t<td>" . PHP_EOL;
-					$outstr .= "\t\t\t\t<table>". PHP_EOL;
+					$outstr .= "\t\t\t\t<table>" . PHP_EOL;
 				} else {
 					$outstr .= "\t\t\t<td style='text-align:" . $alignment[$item['align']] . ";'>" . PHP_EOL;
 					$outstr .= "\t\t\t\t<table style='width:100%;'>" . PHP_EOL;
@@ -1691,37 +1876,38 @@ function reports_graph_area($graphs, &$report, $item, $timespan, $output, $forma
 /**
  * convert png images stream to jpeg using php-gd
  *
- * @param string $png_data	- the png image as a stream
- * @return string			- the jpeg image as a stream
+ * @param string $png_data The png image as a stream
+ *
+ * @return string The jpeg image as a stream
  */
-function png2jpeg ($png_data) {
-	global $config;
+function png2jpeg(string $png_data) : string {
+	$ImageData = '';
 
 	if ($png_data != '') {
 		$fn = '/tmp/' . time() . '.png';
 
-		/* write rrdtool's png file to scratch dir */
+		// write rrdtool's png file to scratch dir
 		$f = fopen($fn, 'wb');
 		fwrite($f, $png_data);
 		fclose($f);
 
-		/* create php-gd image object from file */
+		// create php-gd image object from file
 		$im = imagecreatefrompng($fn);
-		if (!$im) {								/* check for errors */
-			$im = ImageCreate (150, 30);		/* create an empty image */
-			$bgc = ImageColorAllocate ($im, 255, 255, 255);
-			$tc  = ImageColorAllocate ($im, 0, 0, 0);
-			ImageFilledRectangle ($im, 0, 0, 150, 30, $bgc);
-			/* print error message */
-			ImageString($im, 1, 5, 5, "Error while opening: $fn", $tc);
+
+		if (!$im) {								// check for errors
+			$im  = imagecreate(150, 30);		// create an empty image
+			$bgc = imagecolorallocate($im, 255, 255, 255);
+			$tc  = imagecolorallocate($im, 0, 0, 0);
+			imagefilledrectangle($im, 0, 0, 150, 30, $bgc);
+			// print error message
+			imagestring($im, 1, 5, 5, "Error while opening: $fn", $tc);
 		}
 
-        ob_start(); // start a new output buffer to capture jpeg image stream
+		ob_start(); // start a new output buffer to capture jpeg image stream
 		imagejpeg($im);	// output to buffer
-		$ImageData = ob_get_contents(); // fetch image from buffer
+		$ImageData       = ob_get_contents(); // fetch image from buffer
 		$ImageDataLength = ob_get_length();
 		ob_end_clean(); // stop this output buffer
-		imagedestroy($im); //clean up
 
 		unlink($fn); // delete scratch file
 	}
@@ -1732,37 +1918,38 @@ function png2jpeg ($png_data) {
 /**
  * convert png images stream to gif using php-gd
  *
- * @param string $png_data	- the png image as a stream
- * @return string			- the gif image as a stream
+ * @param string $png_data The png image as a stream
+ *
+ * @return string The gif image as a stream
  */
-function png2gif ($png_data) {
-	global $config;
+function png2gif(string $png_data) : string {
+	$ImageData = '';
 
 	if ($png_data != '') {
 		$fn = '/tmp/' . time() . '.png';
 
-		/* write rrdtool's png file to scratch dir */
+		// write rrdtool's png file to scratch dir
 		$f = fopen($fn, 'wb');
 		fwrite($f, $png_data);
 		fclose($f);
 
-		/* create php-gd image object from file */
+		// create php-gd image object from file
 		$im = imagecreatefrompng($fn);
-		if (!$im) {								/* check for errors */
-			$im = ImageCreate (150, 30);		/* create an empty image */
-			$bgc = ImageColorAllocate ($im, 255, 255, 255);
-			$tc  = ImageColorAllocate ($im, 0, 0, 0);
-			ImageFilledRectangle ($im, 0, 0, 150, 30, $bgc);
-			/* print error message */
-			ImageString($im, 1, 5, 5, "Error while opening: $fn", $tc);
+
+		if (!$im) {								// check for errors
+			$im  = imagecreate(150, 30);		// create an empty image
+			$bgc = imagecolorallocate($im, 255, 255, 255);
+			$tc  = imagecolorallocate($im, 0, 0, 0);
+			imagefilledrectangle($im, 0, 0, 150, 30, $bgc);
+			// print error message
+			imagestring($im, 1, 5, 5, "Error while opening: $fn", $tc);
 		}
 
-        ob_start(); // start a new output buffer to capture gif image stream
+		ob_start(); // start a new output buffer to capture gif image stream
 		imagegif($im);	// output to buffer
-		$ImageData = ob_get_contents(); // fetch image from buffer
+		$ImageData       = ob_get_contents(); // fetch image from buffer
 		$ImageDataLength = ob_get_length();
 		ob_end_clean(); // stop this output buffer
-		imagedestroy($im); //clean up
 
 		unlink($fn); // delete scratch file
 	}
@@ -1772,13 +1959,13 @@ function png2gif ($png_data) {
 
 /**
  * get available format files for cacti reporting
- * @return array	- available format files
+ *
+ * @return array Available format files
  */
-function reports_get_format_files() {
-	global $config;
-
-	$formats = array();
-	$dir     = $config['base_path'] . '/formats';
+function reports_get_format_files() : array {
+	$formats = [];
+	$files   = [];
+	$dir     = CACTI_PATH_FORMATS . '';
 
 	if (is_dir($dir)) {
 		if (function_exists('scandir')) {
@@ -1792,15 +1979,16 @@ function reports_get_format_files() {
 		}
 
 		if (cacti_sizeof($files)) {
-			foreach($files as $file) {
+			foreach ($files as $file) {
 				if (substr_count($file, '.format')) {
 					$contents = file($dir . '/' . $file);
 
 					if (cacti_sizeof($contents)) {
-						foreach($contents as $line) {
+						foreach ($contents as $line) {
 							$line = trim($line);
-							if (substr_count($line, 'Description:') && substr($line, 0, 1) == '#') {
-								$arr = explode(':', $line);
+
+							if (substr_count($line, 'Description:') && str_starts_with($line, '#')) {
+								$arr            = explode(':', $line);
 								$formats[$file] = trim($arr[1]) . ' (' . $file . ')';
 							}
 						}
@@ -1816,56 +2004,62 @@ function reports_get_format_files() {
 /**
  * define the reports code that will be processed at the end of each polling event
  */
-function reports_poller_bottom() {
-	global $config;
-	include_once($config['base_path'] . '/lib/poller.php');
+function reports_poller_bottom() : void {
+	include_once(CACTI_PATH_LIBRARY . '/poller.php');
 
 	$command_string = read_config_option('path_php_binary');
-	$extra_args = '-q ' . $config['base_path'] . '/poller_reports.php';
+	$extra_args     = '-q ' . CACTI_PATH_BASE . '/poller_reports.php';
 	exec_background($command_string, $extra_args);
 }
 
 /**
  * Setup the new dropdown action for Graph Management
- * @arg $action		actions to be performed from dropdown
+ *
+ * @param array $action Actions to be performed from dropdown
  */
-function reports_graphs_action_array($action) {
+function reports_graphs_action_array(array $action) : array {
 	$action['reports'] = __('Add to Report');
+
 	return $action;
 }
 
 /**
  * reports_graphs_action_prepare - perform reports_graph prepare action
- * @param array $save - drp_action: selected action from dropdown
- *              graph_array: graphs titles selected from graph management's list
- *              graph_list: graphs selected from graph management's list
- * returns array $save				-
- *  */
-function reports_graphs_action_prepare($save) {
-	global $config, $graph_timespans, $alignment;
+ *
+ * @param array $save
+ *                    drp_action:  selected action from dropdown
+ *                    graph_array: graphs titles selected from graph management's list
+ *                    graph_list:  graphs selected from graph management's list
+ *
+ * @return mixed $save
+ */
+function reports_graphs_action_prepare(array $save) : mixed {
+	global $graph_timespans, $alignment;
 
-	if ($save['drp_action'] == 'reports') { /* report */
+	if ($save['drp_action'] == 'reports') { // report
 		print "<tr>
 			<td class='textArea'>
-				<p>" . __('Choose the Report to associate these graphs with.  The defaults for alignment will be used for each graph in the list below.') . "</p>
-				<p>" . $save['graph_list'] . "</p>
-				<p>" . __('Report:') . "<br>";
+				<p>" . __('Choose the Report to associate these graphs with.  The defaults for alignment will be used for each graph in the list below.') . '</p>
+				<p>' . $save['graph_list'] . '</p>
+				<p>' . __('Report:') . '<br>';
 
-				form_dropdown('reports_id', db_fetch_assoc_prepared('SELECT reports.id, reports.name
+		form_dropdown('reports_id', db_fetch_assoc_prepared('SELECT reports.id, reports.name
 					FROM reports
 					WHERE user_id = ?
 					ORDER by name',
-					array($_SESSION['sess_user_id'])), 'name', 'id', '', '', '0');
+			[$_SESSION[SESS_USER_ID]]), 'name', 'id', '', '', '0');
 
-				echo '<br><p>' . __('Graph Timespan:') . '<br>';
-				form_dropdown('timespan', $graph_timespans, '', '', '0', '', '', '');
+		print '<br><p>' . __('Graph Timespan:') . '<br>';
+		form_dropdown('timespan', $graph_timespans, '', '', '0', '', '', '');
 
-				echo '<br><p>' . __('Graph Alignment:') . '<br>';
-				form_dropdown('alignment', $alignment, '', '', '0', '', '', '');
+		print '<br><p>' . __('Graph Alignment:') . '<br>';
+		form_dropdown('alignment', $alignment, '', '', '0', '', '', '');
 
-				print "</p>
+		print '</p>
 			</td>
-		</tr>";
+		</tr>';
+
+		return false;
 	} else {
 		return $save;
 	}
@@ -1873,58 +2067,58 @@ function reports_graphs_action_prepare($save) {
 
 /**
  * reports_graphs_action_execute - perform reports_graph execute action
- * @param string $action - action to be performed
- * return -
- *  */
-function reports_graphs_action_execute($action) {
-	global $config;
-
-	if ($action == 'reports') { /* report */
+ *
+ * @param string $action Action to be performed
+ *
+ * @return string $action
+ */
+function reports_graphs_action_execute(string $action) : string {
+	if ($action == 'reports') { // report
 		$message = '';
 
-		/* loop through each of the graph_items selected on the previous page for skipped items */
-		if (isset_request_var('selected_items')) {
-			$selected_items = sanitize_unserialize_selected_items(get_nfilter_request_var('selected_items'));
+		// loop through each of the graph_items selected on the previous page for skipped items
+		if (isrv('selected_items')) {
+			$selected_items = sanitize_unserialize_selected_items(gnrv('selected_items'));
 
 			if ($selected_items != false) {
-				$reports_id      = get_filter_request_var('reports_id');
+				$reports_id      = gfrv('reports_id');
 
-				input_validate_input_number($reports_id);
-				get_filter_request_var('timespan');
-				get_filter_request_var('alignment');
+				input_validate_input_number($reports_id, 'reports_id');
+				gfrv('timespan');
+				gfrv('alignment');
 
 				$report = db_fetch_row_prepared('SELECT *
 					FROM reports
 					WHERE id = ?',
-					array($reports_id));
+					[$reports_id]);
 
-				foreach($selected_items as $local_graph_id) {
-					/* see if the graph is already added */
+				foreach ($selected_items as $local_graph_id) {
+					// see if the graph is already added
 					$exists = db_fetch_cell_prepared('SELECT id
 						FROM reports_items
 						WHERE local_graph_id = ?
 						AND report_id = ?
 						AND timespan = ?',
-						array($local_graph_id, $reports_id, get_nfilter_request_var('timespan')));
+						[$local_graph_id, $reports_id, gnrv('timespan')]);
 
 					if (!$exists) {
 						$sequence = db_fetch_cell_prepared('SELECT MAX(sequence)
 							FROM reports_items
 							WHERE report_id = ?',
-							array($reports_id));
+							[$reports_id]);
 
 						$sequence++;
 
 						$graph_data = db_fetch_row_prepared('SELECT *
 							FROM graph_local
 							WHERE id = ?',
-							array($local_graph_id));
+							[$local_graph_id]);
 
 						if ($graph_data['host_id']) {
 							$host_template = db_fetch_cell_prepared('SELECT host_template_id
 								FROM host
 								WHERE id = ?',
-								array($graph_data['host_id']));
+								[$graph_data['host_id']]);
 						} else {
 							$host_template = 0;
 						}
@@ -1940,13 +2134,14 @@ function reports_graphs_action_execute($action) {
 						$save['host_id']           = $graph_data['host_id'];
 						$save['graph_template_id'] = $graph_data['graph_template_id'];
 						$save['local_graph_id']    = $local_graph_id;
-						$save['timespan']          = get_nfilter_request_var('timespan');
-						$save['align']             = get_nfilter_request_var('alignment');
+						$save['timespan']          = gnrv('timespan');
+						$save['align']             = gnrv('alignment');
 						$save['item_text']         = '';
 						$save['font_size']         = $report['font_size'];
 						$save['sequence']          = $sequence;
 
 						$id = sql_save($save, 'reports_items');
+
 						if ($id) {
 							$message .= __('Created Report Graph Item \'<i>%s</i>\'', get_graph_title($local_graph_id)) . '<br>';
 						} else {
@@ -1962,7 +2157,312 @@ function reports_graphs_action_execute($action) {
 		if ($message != '') {
 			raise_message('report_send', $message, MESSAGE_LEVEL_INFO);
 		}
+	}
+
+	return $action;
+}
+
+/**
+ * reports_log_and_notify - This function will perform the notification functions for Cacti reports.
+ * It is being written to have a common platform to send notifications which can broaden to use
+ * mechanisms outside of Email.  We are designing it first to work with existing plugins and core
+ * cacti functionality and will extend it from there are required.
+ *
+ * The parameters include:
+ *
+ * @param int    $id          The report queue unique id number.
+ * @param int    $start_time  The time that the report process started for logging
+ * @param string $report_type The output type of the report.  To be used by the plugin for re-rendering
+ * @param string $source      The plugin defined report source name.  For example: 'reports', 'reportit', 'flowview'
+ * @param int    $source_id   The id as it is known to the source
+ * @param string $subject     The notification subject
+ * @param mixed  $raw_data    Data required to reproduce the report output at a future date
+ * @param string $oput_raw    The Raw HTML output without CSS
+ * @param string $oput_html   The Report Output with CSS
+ * @param string $oput_text   The text output if any
+ * @param array  $attachments The attachments required to reproduce the report
+ * @param mixed  $headers     Any report specific Email headers
+ *
+ * @return void
+ */
+function reports_log_and_notify(int $id, int $start_time, string $report_type, string $source, int $source_id, string $subject,
+	mixed &$raw_data, string &$oput_raw, string &$oput_html, string &$oput_text, array $attachments = [], mixed $headers = false) : void {
+	$report = db_fetch_row_prepared('SELECT *
+		FROM reports_queued
+		WHERE id = ?',
+		[$id]);
+
+	if ($oput_text == null) {
+		$oput_text = '';
+	}
+
+	$fromemail = read_config_option('settings_from_email');
+
+	if ($fromemail == '') {
+		$fromemail = 'cacti@cacti.net';
+	}
+
+	$fromname = read_config_option('settings_from_name');
+
+	if ($fromname == '') {
+		$fromname = __('Cacti %s', ucfirst($source));
+	}
+
+	$from['email'] = $fromemail;
+	$from['name']  = $fromname;
+
+	if (cacti_sizeof($report)) {
+		if ($report['notification'] != '') {
+			$notifications = json_decode($report['notification'], true);
+
+			foreach ($notifications as $type => $data) {
+				switch($type) {
+					case 'email':
+						if (!isset($data['to_email'])) {
+							cacti_log(sprintf("WARNING: Email Report '%s' not sent!  Missing 'to_email' attribute in request", $report['name']), false, 'REPORTS');
+
+							break;
+						} else {
+							$to_emails = $data['to_email'];
+						}
+
+						if (isset($data['cc_email'])) {
+							$cc_emails = $data['cc_email'];
+						} else {
+							$cc_emails = '';
+						}
+
+						if (isset($data['bcc_email'])) {
+							$bcc_emails = $data['bcc_email'];
+						} else {
+							$bcc_emails = '';
+						}
+
+						if (isset($data['reply_to'])) {
+							$reply_to = $data['reply_to'];
+						} else {
+							$reply_to = '';
+						}
+
+						if (isset($data['from']) && ((is_array($data['from']) && cacti_sizeof($data['from'])) || $data['from'] != '')) {
+							$from = $data['from'];
+						}
+
+						mailer($from, $to_emails, $cc_emails, $bcc_emails, $reply_to, $subject, $oput_html, $oput_text, $attachments, $headers);
+
+						break;
+					case 'notification_list':
+						if (!isset($data['id'])) {
+							cacti_log(sprintf("WARNING: Email Report '%s' not sent!  Missing notification list 'id' attribute in request", $report['name']), false, 'REPORTS');
+
+							break;
+						} else {
+							if (isset($data['from']) && ((is_array($data['from']) && cacti_sizeof($data['from'])) || $data['from'] != '')) {
+								$from = $data['from'];
+							}
+
+							$list = db_fetch_row_prepared('SELECT *
+								FROM plugin_notification_lists
+								WHERE id = ?',
+								[$data['id']]);
+
+							if (cacti_sizeof($list)) {
+								// process the format file
+								$report_tag  = false;
+								$theme       = 'modern';
+								$output_html = '';
+								$format      = $list['format_file'] != '' ? $list['format_file'] : 'default';
+
+								$format_ok = reports_load_format_file($format, $output_html, $report_tag, $theme);
+
+								if ($format_ok) {
+									if ($report_tag) {
+										$oput_html = str_replace('<REPORT>', $oput_html, $output_html);
+									} else {
+										$oput_html = $output_html . PHP_EOL . $oput_html;
+									}
+								}
+
+								$to_emails  = $list['emails'];
+								$cc_emails  = $list['cc_emails'] ?? '';
+								$bcc_emails = $list['bcc_emails'];
+								$reply_to   = $list['reply_to'] ?? '';
+
+								if (isset($data['reply_to']) && $reply_to == '') {
+									$reply_to = $data['reply_to'];
+								} else {
+									$reply_to = '';
+								}
+
+								mailer($from, $to_emails, $cc_emails, $bcc_emails, $reply_to, $subject, $oput_html, $oput_text, $attachments, $headers);
+							} else {
+								cacti_log(sprintf("WARNING: Email Report '%s' not sent!  Unable to locate notification list '%s'", $report['name'], $id), false, 'REPORTS');
+							}
+						}
+
+						break;
+					default:
+						cacti_log(sprintf("WARNING: Email Report '%s' not sent!  Unknown notification type '%s' attribute in request", $report['name'], $type), false, 'REPORTS');
+
+						break;
+				}
+			}
+		}
+
+		// prepare attachments for storage
+		if (cacti_sizeof($attachments)) {
+			foreach ($attachments as $index => $a) {
+				if ($a['inline'] == 'attachment') {
+					if (file_exists($a['attachment'])) {
+						$attachments[$index]['attachment'] = file_get_contents($a['attachment']);
+						$attachments[$index]['inline']     = 'inline';
+					}
+				}
+			}
+		}
+
+		$end_time = microtime(true);
+
+		$save = [];
+
+		$save['id']                 = 0;
+		$save['name']               = $report['name'];
+		$save['source']             = $source;
+		$save['source_id']          = $source_id;
+		$save['report_output_type'] = $report_type;
+		$save['report_raw_data']    = json_encode($raw_data);
+		$save['report_raw_output']  = $oput_raw;
+		$save['report_html_output'] = $oput_html;
+		$save['report_txt_output']  = $oput_text;
+		$save['report_attachments'] = base64_encode(json_encode($attachments));
+		$save['send_type']          = $report['request_type'];
+		$save['send_time']          = date('Y-m-d H:i:s');
+		$save['run_time']           = $end_time - $start_time;
+		$save['sent_by']            = $report['requested_by'];
+		$save['sent_id']            = $report['requested_id'];
+		$save['notification']       = $report['notification'];
+
+		sql_save($save, 'reports_log');
+	}
+}
+
+function reports_queue(string $name, int $request_type, string $source, int $source_id, string $command, array $notification) : mixed {
+	if (isset($_SESSION['sess_user_id'])) {
+		$requested_id = $_SESSION['sess_user_id'];
+		$requested_by = db_fetch_cell_prepared('SELECT username
+			FROM user_auth
+			WHERE id = ?',
+			[$requested_id]);
+
+		if ($requested_by == '') {
+			$requested_by = 'unknown';
+		}
 	} else {
-		return $action;
+		$requested_id = -1;
+		$requested_by = 'system';
+	}
+
+	$save = [];
+
+	$save['id']             = 0;
+	$save['name']           = $name;
+	$save['request_type']   = $request_type;
+	$save['source']         = $source;
+	$save['source_id']      = $source_id;
+	$save['status']         = 'pending';
+	$save['run_command']    = $command;
+	$save['scheduled_time'] = date('Y-m-d H:i:s');
+	$save['notification']   = json_encode($notification);
+	$save['requested_by']   = $requested_by;
+	$save['requested_id']   = $requested_id;
+
+	$id = sql_save($save, 'reports_queued');
+
+	if ($id > 0) {
+		if ($requested_id > 0) {
+			raise_message('report_scheduled', __esc("The Report '%s' from source %s with id %s is scheduled to run!", $name, $source, $source_id, 'flowview'), MESSAGE_LEVEL_INFO);
+		} else {
+			cacti_log(sprintf("The Report '%s' from source %s with id %s is scheduled to run!", $name, $source, $source_id), false, 'REPORTS', POLLER_VERBOSITY_MEDIUM);
+		}
+	} else {
+		if ($requested_id > 0) {
+			raise_message('report_not_scheduled', __("The Report '%s' from source %s with id %s was not scheduled to run due to an error!", $name, $source, $source_id, 'flowview'), MESSAGE_LEVEL_ERROR);
+		} else {
+			cacti_log(sprintf("FATAL: The Report '%s' from source %s with id %s was not scheduled to run due to an error!", $name, $source, $source_id), false, 'REPORTS');
+		}
+	}
+
+	return $id;
+}
+
+function reports_run(int $id) : bool {
+	include_once(CACTI_PATH_BASE . '/lib/poller.php');
+
+	$report = db_fetch_row_prepared('SELECT *
+		FROM reports_queued
+		WHERE id = ?',
+		[$id]);
+
+	if (cacti_sizeof($report)) {
+		db_execute_prepared('UPDATE reports_queued
+			SET status = ?, start_time = ?
+			WHERE id = ?',
+			['running', date('Y-m-d H:i:s'), $id]);
+	} else {
+		return false;
+	}
+
+	$start = microtime(true);
+
+	$return_code = 0;
+	$output      = [];
+	$command     = cacti_escapeshellcmd($report['run_command']) . ' --report-id=' . $report['source_id'] . ' --queue-id=' . $id;
+	$timeout     = $report['run_timeout'];
+	$source      = cacti_strtoupper($report['source']);
+
+	if ($timeout == 0) {
+		$timeout = read_config_option('scheduler_timeout');
+	}
+
+	cacti_log("NOTE: Report:{$report['name']} Command:$command", false, 'REPORTS', POLLER_VERBOSITY_MEDIUM);
+
+	$last_line = exec_with_timeout($command, $output, $return_code, $timeout);
+
+	$end  = microtime(true);
+
+	$stats = sprintf("$source STATS: Time:%0.2f Report:'%s' Id:'%s'", $end - $start, $report['name'], $report['source_id']);
+
+	cacti_log($stats, false, 'SYSTEM');
+
+	db_execute_prepared('DELETE FROM reports_queued WHERE id = ?', [$id]);
+
+	return true;
+}
+
+function get_notification_emails(int $id = 0, string $recipient = 'to') : string {
+	if ($id == 0 || $id === null) {
+		return '';
+	}
+
+	if (function_exists('thold_notification_list_enabled')) {
+		if (!thold_notification_list_enabled($id)) {
+			return '';
+		}
+	}
+
+	if ($id > 0) {
+		if ($recipient == 'to') {
+			return trim(db_fetch_cell_prepared('SELECT emails
+				FROM plugin_notification_lists
+				WHERE id = ?',
+				[$id]));
+		} else {
+			return trim(db_fetch_cell_prepared('SELECT bcc_emails
+				FROM plugin_notification_lists
+				WHERE id = ?',
+				[$id]));
+		}
+	} else {
+		return '';
 	}
 }

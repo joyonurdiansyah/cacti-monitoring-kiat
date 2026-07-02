@@ -23,7 +23,6 @@
  +-------------------------------------------------------------------------+
 */
 
-
 if (function_exists('pcntl_async_signals')) {
 	pcntl_async_signals(true);
 } else {
@@ -33,11 +32,11 @@ if (function_exists('pcntl_async_signals')) {
 ini_set('output_buffering', 'Off');
 
 require(__DIR__ . '/include/cli_check.php');
-require_once($config['base_path'] . '/lib/poller.php');
-require_once($config['base_path'] . '/lib/rrd.php');
-require_once($config['base_path'] . '/lib/rrdcheck.php');
+require_once(CACTI_PATH_LIBRARY . '/poller.php');
+require_once(CACTI_PATH_LIBRARY . '/rrd.php');
+require_once(CACTI_PATH_LIBRARY . '/rrdcheck.php');
 
-/* process calling arguments */
+// process calling arguments
 $parms = $_SERVER['argv'];
 array_shift($parms);
 
@@ -61,43 +60,51 @@ $real_time    = 0;
 $rrd_files    = 0;
 
 if (cacti_sizeof($parms)) {
-	foreach($parms as $parameter) {
-		if (strpos($parameter, '=')) {
-			list($arg, $value) = explode('=', $parameter);
+	foreach ($parms as $parameter) {
+		if (str_contains($parameter, '=')) {
+			[$arg, $value] = explode('=', $parameter, 2);
 		} else {
-			$arg = $parameter;
+			$arg   = $parameter;
 			$value = '';
 		}
 
 		switch ($arg) {
-		case '-d':
-		case '--debug':
-			$debug = true;
-			break;
-		case '-f':
-		case '--force':
-			$forcerun = true;
-			break;
-		case '--type':
-			$type = $value;
-			break;
-		case '--child':
-			$thread_id = $value;
-			break;
-		case '--version':
-		case '-v':
-		case '-V':
-			display_version();
-			exit(0);
-		case '--help':
-		case '-h':
-		case '-H':
-			display_help();
-			exit(0);
-		default:
-			print 'ERROR: Invalid Parameter ' . $parameter . PHP_EOL . PHP_EOL;
-			display_help();
-			exit(1);
+			case '-d':
+			case '--debug':
+				$debug = true;
+
+				break;
+			case '-f':
+			case '--force':
+				$forcerun = true;
+
+				break;
+			case '--type':
+				$type = $value;
+
+				break;
+			case '--child':
+				$thread_id = $value;
+
+				break;
+			case '--version':
+			case '-v':
+			case '-V':
+				display_version();
+
+				exit(0);
+			case '--help':
+			case '-h':
+			case '-H':
+				display_help();
+
+				exit(0);
+
+			default:
+				print 'ERROR: Invalid Parameter ' . $parameter . PHP_EOL . PHP_EOL;
+				display_help();
+
+				exit(1);
 		}
 	}
 }
@@ -107,29 +114,31 @@ if (cacti_sizeof($parms)) {
  *
  * pmaster  - the main process launched from the Cacti main poller and will launch child processes
  * pchild   - a child of the master process from the 'master'
-
+ *
  * bmaster  - a boost master process, will perform launch bchild processes
  * bchild   - a child of the boost master process, will launch boost collection
  */
 
-/* install signal handlers for UNIX only */
+// install signal handlers for UNIX only
 if (function_exists('pcntl_signal')) {
 	pcntl_signal(SIGTERM, 'sig_handler');
 	pcntl_signal(SIGINT, 'sig_handler');
 }
 
-/* take time and log performance data */
+// take time and log performance data
 $start = microtime(true);
 
-/* let's give this script lot of time to run for ever */
+$timeout = intval(read_config_option('rrdcheck_timeout'));
+
+// let's give this script lot of time to run for ever
 ini_set('max_execution_time', '0');
 
-/* send a gentle message to the log and stdout */
+// send a gentle message to the log and stdout
 rrdcheck_debug('Polling Starting');
 
-/* silently end if the registered process is still running */
+// silently end if the registered process is still running
 if (!$forcerun) {
-	if (!register_process_start('rrdcheck', $type, $thread_id, read_config_option('rrdcheck_timeout'))) {
+	if (!register_process_start('rrdcheck', $type, $thread_id, $timeout)) {
 		exit(0);
 	}
 }
@@ -145,7 +154,7 @@ switch ($type) {
 	case 'bmaster': // Launched at the end of boost
 		rrdcheck_launch_children($type);
 
-		/* Wait for all processes to continue */
+		// Wait for all processes to continue
 		while ($running = rrdcheck_processes_running($type)) {
 			rrdcheck_debug(sprintf('%s Processes Running, Sleeping for 2 seconds.', $running));
 			sleep(2);
@@ -175,18 +184,18 @@ if (!$forcerun) {
 
 exit(0);
 
-function rrdcheck_master_handler($forcerun) {
+function rrdcheck_master_handler(bool $forcerun = false) : void {
 	global $type;
 
-	/* read some important settings relative to timing from the database */
+	// read some important settings relative to timing from the database
 	$run_interval = read_config_option('rrdcheck_interval');
 
 	$last_run = read_config_option('rrdcheck_last_run_time');
 
-	/* see if boost is active or not */
+	// see if boost is active or not
 	$boost_active = read_config_option('boost_rrd_update_enable');
 
-	/* next let's see if it's time to update the interval */
+	// next let's see if it's time to update the interval
 	$current_time = time();
 
 	if ($boost_active == 'on') {
@@ -209,7 +218,6 @@ function rrdcheck_master_handler($forcerun) {
 
 		// if it's time to check, do so now
 		if ((!empty($last_run) && (($last_run + ($run_interval * 60)) < $current_time)) || $forcerun) {
-
 			rrdcheck_launch_children($type);
 
 			// Wait for all processes to continue
@@ -229,15 +237,15 @@ function rrdcheck_master_handler($forcerun) {
 /**
  * display_version - displays version information
  */
-function display_version() {
-	$version = get_cacti_version();
+function display_version() : void {
+	$version = get_cacti_cli_version();
 	print "Cacti RRD Check Poller, Version $version " . COPYRIGHT_YEARS . PHP_EOL;
 }
 
 /**
  * display_help - generic help screen for utilities
  */
-function display_help () {
+function display_help() : void {
 	display_version();
 
 	print PHP_EOL . 'usage: poller_rrdcheck.php [--force] [--debug]' . PHP_EOL . PHP_EOL;
@@ -258,11 +266,11 @@ function display_help () {
 /**
  * sig_handler - provides a generic means to catch exceptions to the Cacti log.
  *
- * @param $signo - (int) the signal that was thrown by the interface.
+ * @param int $signo - The signal that was thrown by the interface.
  *
- * @return - null
+ * @return void
  */
-function sig_handler($signo) {
+function sig_handler(int $signo) : void {
 	global $type, $thread_id;
 
 	switch ($signo) {
@@ -270,21 +278,19 @@ function sig_handler($signo) {
 		case SIGINT:
 			cacti_log('WARNING: rrdcheck Poller terminated by user', false, 'RRDCHECK');
 
-			/* tell the main poller that we are done */
+			// tell the main poller that we are done
 			if ($type == 'master') {
 				set_config_option('rrdcheck_poller_status', 'terminated - end time:' . date('Y-m-d G:i:s'));
 			}
 
-			if (strpos($type, 'master') !== false) {
+			if (str_contains($type, 'master')) {
 				rrdcheck_kill_running_processes();
 			}
 
 			unregister_process('rrdcheck', $type, $thread_id, getmypid());
 
 			exit(1);
-			break;
 		default:
-			/* ignore all other signals */
+			// ignore all other signals
 	}
 }
-

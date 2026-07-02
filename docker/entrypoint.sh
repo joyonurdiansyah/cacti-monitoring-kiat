@@ -1,120 +1,84 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CACTI_ROOT=/var/www/html
+cat > /usr/local/etc/php/conf.d/cacti-runtime.ini <<INI
+date.timezone = ${TIMEZONE:-UTC}
+memory_limit = ${PHP_MEMORY_LIMIT:-512M}
+max_execution_time = 60
+INI
 
-# Read environment variables with defaults
-DB_HOST="${CACTI_DB_HOST:-cacti-db}"
-DB_PORT="${CACTI_DB_PORT:-3306}"
-DB_NAME="${CACTI_DB_NAME:-cacti}"
-DB_USER="${CACTI_DB_USER:-cactiuser}"
-DB_PASS="${CACTI_DB_PASS:-cactipass}"
-URL_PATH="${CACTI_URL_PATH:-/}"
-TZ="${TZ:-Asia/Jakarta}"
-
-log() { printf '[entrypoint] %s\n' "$*" >&2; }
-
-# Set timezone
-if [ -f /usr/share/zoneinfo/"${TZ}" ]; then
-    ln -sf /usr/share/zoneinfo/"${TZ}" /etc/localtime
-    echo "${TZ}" > /etc/timezone
-fi
-
-# Configure include/config.php from environment
-CONFIG_PHP="${CACTI_ROOT}/include/config.php"
-if [ ! -f "${CONFIG_PHP}" ]; then
-    log "Creating include/config.php from .dist template"
-    cp "${CACTI_ROOT}/include/config.php.dist" "${CONFIG_PHP}"
-fi
-
-log "Applying database configuration to include/config.php"
-sed -i -E \
-    -e "s|^(\\\$database_hostname[[:space:]]*=[[:space:]]*)'[^']*';|\\1'${DB_HOST}';|" \
-    -e "s|^(\\\$database_username[[:space:]]*=[[:space:]]*)'[^']*';|\\1'${DB_USER}';|" \
-    -e "s|^(\\\$database_password[[:space:]]*=[[:space:]]*)'[^']*';|\\1'${DB_PASS}';|" \
-    -e "s|^(\\\$database_default[[:space:]]*=[[:space:]]*)'[^']*';|\\1'${DB_NAME}';|" \
-    -e "s|^(\\\$database_port[[:space:]]*=[[:space:]]*)'[^']*';|\\1'${DB_PORT}';|" \
-    -e "s|^(\\\$url_path[[:space:]]*=[[:space:]]*)'[^']*';|\\1'${URL_PATH}';|" \
-    "${CONFIG_PHP}"
-
-# Wait for database
-log "Waiting for MySQL at ${DB_HOST}:${DB_PORT}..."
-attempt=0
-until php -r "
-    \$m = @new mysqli('${DB_HOST}', '${DB_USER}', '${DB_PASS}', '${DB_NAME}', ${DB_PORT});
-    if (\$m->connect_errno) { exit(1); }
-    exit(0);
-" 2>/dev/null; do
-    attempt=$((attempt + 1))
-    if [ "${attempt}" -ge 30 ]; then
-        log "MySQL not reachable after 30 attempts"
-        exit 1
-    fi
-    sleep 2
-done
-log "MySQL is reachable after ${attempt} attempt(s)"
-
-# Check if Cacti is already installed (version table has actual version)
-CACTI_VER=$(tr -d '[:space:]' < "${CACTI_ROOT}/include/cacti_version")
-INSTALLED=$(php -r "
-    \$m = new mysqli('${DB_HOST}', '${DB_USER}', '${DB_PASS}', '${DB_NAME}', ${DB_PORT});
-    \$r = \$m->query(\"SELECT cacti FROM version WHERE cacti != 'new_install'\");
-    echo \$r && \$r->num_rows > 0 ? 'yes' : 'no';
-    \$m->close();
-" 2>/dev/null || echo "no")
-
-if [ "${INSTALLED}" = "no" ]; then
-    log "Cacti not yet installed — importing schema..."
-
-    # Count tables to see if schema exists
-    TABLE_COUNT=$(php -r "
-        \$m = new mysqli('${DB_HOST}', '${DB_USER}', '${DB_PASS}', '${DB_NAME}', ${DB_PORT});
-        \$r = \$m->query('SHOW TABLES');
-        echo \$r ? \$r->num_rows : 0;
-        \$m->close();
-    " 2>/dev/null || echo "0")
-
-    if [ "${TABLE_COUNT}" -lt 10 ]; then
-    log "Importing cacti.sql schema..."
-    mysql \
-        --host="${DB_HOST}" \
-        --port="${DB_PORT}" \
-        --user="${DB_USER}" \
-        --password="${DB_PASS}" \
-        --protocol=TCP \
-        "${DB_NAME}" < "${CACTI_ROOT}/cacti.sql"
-    fi
-
-    # Mark installation as complete
-    log "Marking Cacti version as ${CACTI_VER}"
-    mysql \
-        --host="${DB_HOST}" \
-        --port="${DB_PORT}" \
-        --user="${DB_USER}" \
-        --password="${DB_PASS}" \
-        --protocol=TCP \
-        "${DB_NAME}" \
-        --execute="UPDATE version SET cacti='${CACTI_VER}' WHERE cacti='new_install';"
-    mysql \
-        --host="${DB_HOST}" \
-        --port="${DB_PORT}" \
-        --user="${DB_USER}" \
-        --password="${DB_PASS}" \
-        --protocol=TCP \
-        "${DB_NAME}" \
-        --execute="INSERT INTO settings (name, value) VALUES ('install_complete','1') ON DUPLICATE KEY UPDATE value=VALUES(value);"
-
-    log "Installation complete"
-else
-    log "Cacti already installed — skipping schema import"
-fi
-
-# Ensure writable directories
-for d in log rra cache; do
-    if [ -d "${CACTI_ROOT}/${d}" ]; then
-        chmod -R a+w "${CACTI_ROOT}/${d}" 2>/dev/null || true
-    fi
+for dir in /var/www/html/cacti/cache \
+           /var/www/html/cacti/rra \
+           /var/www/html/cacti/log; do
+    [ -d "$dir" ] && chown -R www-data:www-data "$dir"
 done
 
-log "Starting services..."
-exec "$@"
+if [ ! -f /var/www/html/cacti/include/config.php ]; then
+    cat > /var/www/html/cacti/include/config.php <<'PHPCONFIG'
+<?php
+/*
+ +-------------------------------------------------------------------------+
+ | Copyright (C) 2004-2026 The Cacti Group                                 |
+ |                                                                         |
+ | This program is free software; you can redistribute it and/or           |
+ | modify it under the terms of the GNU General Public License             |
+ | as published by the Free Software Foundation; either version 2          |
+ | of the License, or (at your option) any later version.                  |
+ |                                                                         |
+ | This program is distributed in the hope that it will be useful,         |
+ | but WITHOUT ANY WARRANTY; without even the implied warranty of          |
+ | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
+ | GNU General Public License for more details.                            |
+ +-------------------------------------------------------------------------+
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
+ +-------------------------------------------------------------------------+
+ | This code is designed, written, and maintained by the Cacti Group. See  |
+ | about.php and/or the AUTHORS file for specific developer information.   |
+ +-------------------------------------------------------------------------+
+ | http://www.cacti.net/                                                   |
+ +-------------------------------------------------------------------------+
+*/
+
+$database_type     = 'mysql';
+PHPCONFIG
+
+    # Reject quotes/backslashes that would break the PHP string literals below
+    for _var in DB_NAME DB_HOST DB_USER DB_PASS DB_PORT; do
+        _val="${!_var:-}"
+        if [[ "$_val" =~ [\'\\] ]]; then
+            echo "ERROR: $_var contains unsafe characters (single quote or backslash)" >&2
+            exit 1
+        fi
+    done
+
+    cat >> /var/www/html/cacti/include/config.php <<PHPCONFIG
+\$database_default  = '${DB_NAME:-cacti}';
+\$database_hostname = '${DB_HOST:-localhost}';
+\$database_username = '${DB_USER:-cacti}';
+\$database_password = '${DB_PASS:-cacti}';
+\$database_port     = '${DB_PORT:-3306}';
+PHPCONFIG
+
+    cat >> /var/www/html/cacti/include/config.php <<'PHPCONFIG'
+$database_retries  = 5;
+$database_ssl      = false;
+$database_persist  = false;
+$poller_id         = 1;
+$url_path          = '/cacti/';
+
+$cacti_session_name = 'Cacti';
+PHPCONFIG
+
+    chown www-data:www-data /var/www/html/cacti/include/config.php
+fi
+
+cat > /etc/cron.d/cacti-poller <<CRON
+*/5 * * * * www-data php /var/www/html/cacti/poller.php >> /proc/1/fd/1 2>> /proc/1/fd/2
+CRON
+
+chmod 0644 /etc/cron.d/cacti-poller
+cron
+
+php-fpm -D
+
+exec apachectl -D FOREGROUND

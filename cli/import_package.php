@@ -26,17 +26,19 @@
 ini_set('zlib.output_compression', '0');
 
 require(__DIR__ . '/../include/cli_check.php');
-require_once($config['base_path'] . '/lib/import.php');
-require_once($config['base_path'] . '/lib/poller.php');
-require_once($config['base_path'] . '/lib/utility.php');
-require_once($config['base_path'] . '/lib/template.php');
+require_once(CACTI_PATH_LIBRARY . '/import.php');
+require_once(CACTI_PATH_LIBRARY . '/poller.php');
+require_once(CACTI_PATH_LIBRARY . '/utility.php');
+require_once(CACTI_PATH_LIBRARY . '/template.php');
+require_once(CACTI_PATH_LIBRARY . '/xml.php');
 
-if ($config['poller_id'] > 1) {
+if (POLLER_ID > 1) {
 	print 'FATAL: This utility is designed for the main Data Collector only' . PHP_EOL;
+
 	exit(1);
 }
 
-/* process calling arguments */
+// process calling arguments
 $parms = $_SERVER['argv'];
 array_shift($parms);
 
@@ -52,11 +54,11 @@ if (cacti_sizeof($parms)) {
 	$profile_id      = '';
 	$profile_set     = false;
 
-	foreach($parms as $parameter) {
-		if (strpos($parameter, '=')) {
-			list($arg, $value) = explode('=', $parameter, 2);
+	foreach ($parms as $parameter) {
+		if (str_contains($parameter, '=')) {
+			[$arg, $value] = explode('=', $parameter, 2);
 		} else {
-			$arg = $parameter;
+			$arg   = $parameter;
 			$value = '';
 		}
 
@@ -68,6 +70,7 @@ if (cacti_sizeof($parms)) {
 			case '--with-profile':
 				if ($profile_set) {
 					print 'The argument --with-profile can not be used in conjunction with --profile-id.' . PHP_EOL;
+
 					exit(1);
 				}
 
@@ -91,6 +94,7 @@ if (cacti_sizeof($parms)) {
 			case '--profile-id':
 				if ($profile_set) {
 					print 'The argument --profile-id can not be used in conjunction with --with-profile.' . PHP_EOL;
+
 					exit(1);
 				}
 
@@ -111,14 +115,18 @@ if (cacti_sizeof($parms)) {
 			case '-H':
 			case '-h':
 				display_help();
+
 				exit(0);
 			case '--version':
 			case '-V':
 			case '-v':
 				display_version();
+
 				exit(0);
+
 			default:
 				print "ERROR: Invalid Argument: ($arg)" . PHP_EOL . PHP_EOL;
+
 				exit(1);
 		}
 	}
@@ -129,13 +137,16 @@ if (cacti_sizeof($parms)) {
 
 			if ($result !== false && cacti_sizeof($result)) {
 				print json_encode($result);
+
 				exit(0);
 			} else {
 				print 'FATAL: Error processing package file.  Info not returned' . PHP_EOL;
+
 				exit(1);
 			}
 		} else {
 			print "ERROR: file $filename is not readable, is a directory or does not exist" . PHP_EOL . PHP_EOL;
+
 			exit(1);
 		}
 	}
@@ -144,10 +155,11 @@ if (cacti_sizeof($parms)) {
 		$exists = db_fetch_cell_prepared('SELECT id
 			FROM data_source_profiles
 			WHERE id = ?',
-			array($profile_id));
+			[$profile_id]);
 
 		if (empty($exists)) {
 			print 'FATAL: Data Source Profile ID ' . $profile_id . ' does not exist!' . PHP_EOL;
+
 			exit(1);
 		}
 	} else {
@@ -155,7 +167,7 @@ if (cacti_sizeof($parms)) {
 	}
 
 	if ($filename != '') {
-		if (file_exists($filename) && is_readable($filename) && file_exists($filename) && !is_dir($filename)) {
+		if (file_exists($filename) && is_readable($filename) && !is_dir($filename)) {
 			$fp   = fopen($filename, 'r');
 			$data = fread($fp, filesize($filename));
 
@@ -172,36 +184,51 @@ if (cacti_sizeof($parms)) {
 				import_display_results($debug_data, $filestatus, false, $preview_only);
 			} else {
 				print "ERROR: file $filename import process failed due to errors with the XML file" . PHP_EOL . PHP_EOL;
+
 				exit(1);
 			}
 		} else {
 			print "ERROR: file $filename is not readable, is a directory or does not exist" . PHP_EOL . PHP_EOL;
+
 			exit(1);
 		}
 	} else {
 		print 'ERROR: no filename specified' . PHP_EOL . PHP_EOL;
 		display_help();
+
 		exit(1);
 	}
 } else {
 	print 'ERROR: no parameters given' . PHP_EOL . PHP_EOL;
 	display_help();
+
 	exit(1);
 }
 
-/*  display_version - displays version information */
-function display_version() {
+/**
+ * display_version - displays version information
+ *
+ * @return void
+ */
+function display_version() : void {
 	$version = get_cacti_cli_version();
 	print "Cacti Import Template Utility, Version $version, " . COPYRIGHT_YEARS . PHP_EOL;
 }
 
-function display_help() {
+/**
+ * display_help - displays the usage of the function
+ *
+ * @return void
+ */
+function display_help() : void {
 	display_version();
 
 	print PHP_EOL . 'usage: import_package.php --filename=[filename] [--info] [--remove-orphans] [--replace-svalues] [--with-profile] [--profile-id=N' . PHP_EOL . PHP_EOL;
 	print 'A utility to allow signed Cacti Packages to be imported from the command line.' . PHP_EOL . PHP_EOL;
+
 	print 'Required:' . PHP_EOL;
 	print '    --filename              The name of the gzipped package file to import' . PHP_EOL . PHP_EOL;
+
 	print 'Optional:' . PHP_EOL;
 	print '    --info            Output the info section of the package, do not import' . PHP_EOL;
 	print '    --preview         Preview the Template Import, do not import' . PHP_EOL;

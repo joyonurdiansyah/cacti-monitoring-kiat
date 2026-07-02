@@ -22,26 +22,31 @@
  +-------------------------------------------------------------------------+
 */
 
-/* usort_data_query_index - attempts to sort a data query index either numerically
-     or alphabetically depending on which seems best. it also tries to strip out
-     extra characters before sorting to improve accuracy when sorting things like
-     switch ifNames, etc
-   @arg $a - the first string to compare
-   @arg $b - the second string to compare
-   @returns - '1' if $a is greater than $b, '-1' if $a is less than $b, or '0' if
-     $b is equal to $b */
-function usort_data_query_index($a, $b) {
+/**
+ * usort_data_query_index - attempts to sort a data query index either numerically
+ * or alphabetically depending on which seems best. it also tries to strip out
+ * extra characters before sorting to improve accuracy when sorting things like
+ * switch ifNames, etc
+ *
+ * @param string $a
+ * @param string $b
+ *
+ * @return int '1' if $a is greater than $b, '-1' if $a is less than $b, or '0' if
+ */
+function usort_data_query_index(string $a, string $b) : int {
 	/* split strings to be compared into chunks
 	 * that shall be compared separately,
 	 * e.g. for gi0/1, gi0/2, ... */
 	$arr_a = explode('/', $a);
 	$arr_b = explode('/', $b);
 
-	for ($i=0; $i<min(cacti_count($arr_a), cacti_count($arr_b)); $i++) {
+	for ($i = 0; $i < min(cacti_count($arr_a), cacti_count($arr_b)); $i++) {
 		if ((is_numeric($arr_a[$i])) && (is_numeric($arr_b[$i]))) {
 			if (intval($arr_a[$i]) > intval($arr_b[$i])) {
 				return 1;
-			} elseif (intval($arr_a[$i]) < intval($arr_b[$i])) {
+			}
+
+			if (intval($arr_a[$i]) < intval($arr_b[$i])) {
 				return -1;
 			}
 		} else {
@@ -55,55 +60,74 @@ function usort_data_query_index($a, $b) {
 
 	if (cacti_count($arr_a) < cacti_count($arr_b)) {
 		return 1;
-	} elseif (cacti_count($arr_a) > cacti_count($arr_b)) {
+	}
+
+	if (cacti_count($arr_a) > cacti_count($arr_b)) {
 		return -1;
 	}
 
 	return 0;
 }
 
-/* usort_numeric - sorts two values numerically (ie. 1, 34, 36, 76)
-   @arg $a - the first string to compare
-   @arg $b - the second string to compare
-   @returns - '1' if $a is greater than $b, '-1' if $a is less than $b, or '0' if
-     $b is equal to $b */
-function usort_numeric($a, $b) {
+/**
+ * usort_numeric - sorts two values numerically (ie. 1, 34, 36, 76)
+ *
+ * @param string $a
+ * @param string $b
+ *
+ * @return int - '1' if $a is greater than $b, '-1' if $a is less than $b, or '0' if
+ */
+function usort_numeric(string $a, string $b) : int {
 	if (intval($a) > intval($b)) {
 		return 1;
-	} elseif (intval($a) < intval($b)) {
+	}
+
+	if (intval($a) < intval($b)) {
 		return -1;
 	} else {
 		return 0;
 	}
 }
 
-/* usort_alphabetic - sorts two values alphabetically (ie. ab, by, ef, xy)
-   @arg $a - the first string to compare
-   @arg $b - the second string to compare
-   @returns - '1' if $a is greater than $b, '-1' if $a is less than $b, or '0' if
-     $b is equal to $b */
-function usort_alphabetic($a, $b) {
+/**
+ * usort_alphabetic - sorts two values alphabetically (ie. ab, by, ef, xy)
+ *
+ * @param string $a
+ * @param string $b
+ *
+ * @return int - '1' if $a is greater than $b, '-1' if $a is less than $b, or '0' if
+ */
+function usort_alphabetic(string $a, string $b) : int {
 	return strcmp($a, $b);
 }
 
-/* usort_natural - sorts two values naturally (ie. ab1, ab2, ab7, ab10, ab20)
-   @arg $a - the first string to compare
-   @arg $b - the second string to compare
-   @returns - '1' if $a is greater than $b, '-1' if $a is less than $b, or '0' if
-     $b is equal to $b */
-function usort_natural($a, $b) {
+/**
+ * usort_natural - sorts two values naturally (ie. ab1, ab2, ab7, ab10, ab20)
+ *
+ * @param string $a
+ * @param string $b
+ *
+ * @return int - '1' if $a is greater than $b, '-1' if $a is less than $b, or '0' if
+ */
+function usort_natural(string $a, string $b) : int {
 	return strnatcmp($a, $b);
 }
 
-/* sort_by_subkey - takes the list of templates and perform a final sort
-   @returns - (array) an array of sorted templates */
-function sort_by_subkey(&$array, $subkey, $sort = SORT_ASC) {
-	$keys = array();
+/**
+ * sort_by_subkey - takes the list of templates and perform a final sort
+ *
+ * @param array $array
+ * @param mixed $subkey
+ * @param int   $sort
+ *
+ * @return bool - The result of the sort operation
+ */
+function sort_by_subkey(array &$array, mixed $subkey, int $sort = SORT_ASC) : bool {
+	$keys = [];
 
-    foreach ($array as $subarray) {
-        $keys[] = $subarray[$subkey];
-    }
+	foreach ($array as $subarray) {
+		$keys[] = $subarray[$subkey];
+	}
 
-    array_multisort($keys, $sort, $array);
+	return array_multisort($keys, $sort, $array);
 }
-

@@ -28,21 +28,21 @@ global $original_memory_limit;
 $original_memory_limit = ini_get('memory_limit');
 ini_set('memory_limit','-1');
 
-include(dirname(__FILE__) . '/../include/cli_check.php');
-include(dirname(__FILE__) . '/../lib/utility.php');
+include(__DIR__ . '/../include/cli_check.php');
+include(__DIR__ . '/../lib/utility.php');
 
-if ($argv !== false && $argc != false && $argc > 1) {
-	$value = strtolower($argv[1]);
+if (is_array($argv) && $argc > 1) {
+	$value = cacti_strtolower($argv[1]);
 
 	if ($value == 'extensions') {
 		$ext = false;
-		utility_php_verify_extensions($ext,'cli');
+		utility_php_verify_extensions($ext, 'cli');
 		print json_encode($ext);
-	} else if ($value == 'recommends') {
+	} elseif ($value == 'recommends') {
 		$rec = false;
 		utility_php_verify_recommends($rec, 'cli');
 		print json_encode($rec);
-	} else if ($value == 'optionals') {
+	} elseif ($value == 'optionals') {
 		$opt = false;
 		utility_php_verify_optionals($opt, 'cli');
 		print json_encode($opt);

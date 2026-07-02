@@ -22,57 +22,28 @@
  +-------------------------------------------------------------------------+
 */
 
-include('./include/auth.php');
+require('./include/auth.php');
 
-$version = get_cacti_version();
+$version = CACTI_VERSION_TEXT;
 
 if (isset($_SERVER['HTTP_REFERER'])) {
 	$redirect = validate_redirect_url($_SERVER['HTTP_REFERER'], 'index.php');
-	$goBack = "<td colspan='2' class='center'>[<a href='" . $redirect . "'>" . __('Return') . "</a> | <a href='" . $config['url_path'] . "logout.php'>" . __('Login Again') . "</a>]</td>";
+	$goBack   = "[<a href='" . $redirect . "'>" . __('Return') . "</a> | <a href='" . CACTI_PATH_URL . "logout.php'>" . __('Login Again') . '</a>]';
 } else {
-	$goBack = "<td colspan='2' class='center'>[<a class='returnTo' href='#'>" . __('Return') . "</a> | <a href='" . $config['url_path'] . "logout.php'>" . __('Login Again') . "</a>]</td>";
+	$goBack   = "[<a href='#' onClick='window.history.back()'>" . __('Return') . "</a> | <a href='" . CACTI_PATH_URL . "logout.php'>" . __('Login Again') . '</a>]';
 }
 
-/* allow for plugin based permission denied page */
+// allow for plugin based permission denied page
 if (api_plugin_hook_function('custom_denied', OPER_MODE_NATIVE) === OPER_MODE_RESKIN) {
 	exit;
 }
 
 raise_ajax_permission_denied();
 
-print "<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN' 'http://www.w3.org/TR/html4/loose.dtd'>\n";
-print "<html>\n";
-print "<head>\n";
-html_common_header(__('Permission Denied'));
-print "</head>\n";
-print "<body class='logoutBody'>
-	<div class='logoutLeft'></div>
-	<div class='logoutCenter'>
-		<div class='logoutArea'>
-			<div class='cactiLogoutLogo'></div>
-			<legend>" . __('Permission Denied') . "</legend>
-			<div class='logoutTitle'>
-				<p>" . __('You are not permitted to access this section of Cacti.') . '</p><p>' . __('If you feel that this is an error. Please contact your Cacti Administrator.') . "</p>
-				<center>" . $goBack . "</center>
-			</div>
-			<div class='logoutErrors'></div>
-		</div>
-		<div class='versionInfo'>" . __('Version') . " " . $version . " | " . COPYRIGHT_YEARS_SHORT . "</div>
-	</div>
-	<div class='logoutRight'></div>
-	<script type='text/javascript' " . CactiSecureHeaders::getNonceAttribute() . ">
-	$(function() {
-		$('.loginLeft').css('width',parseInt($(window).width()*0.33)+'px');
-		$('.loginRight').css('width',parseInt($(window).width()*0.33)+'px');
-		$('.returnTo').on('click', function() {
-			window.history.back();
-		});
-	});
-	</script>";
-
-include_once('./include/global_session.php');
-
-print "</body>
-</html>\n";
-exit;
-
+html_auth_header('denied', __('Permission Denied'), __('Permission Denied'),
+	__('You are not permitted to access this section of Cacti.'));
+?>
+	<tr><td><?php print __('If you feel that this is an error. Please contact your Cacti Administrator.'); ?></td></tr>
+	<tr><td><center><?php print $goBack; ?></center></td></tr>
+<?php
+html_auth_footer('denied');

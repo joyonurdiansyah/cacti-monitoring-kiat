@@ -97,8 +97,9 @@ img {
 }
 
 i.fa, i.fas, i.fab, i.far, i.fal {
+	font-size: 15px;
 	padding: 0px 3px;
-	font-size: 13px;
+	text-align: left;
 	vertical-align: middle;
 }
 
@@ -114,6 +115,42 @@ fieldset {
 	border: none;
 	padding: 0px;
 	margin: 0px;
+}
+
+.cols1 {
+	width: 100%;
+	display:table-cell;
+}
+
+.cols2 {
+	width: 50%;
+	display:table-cell;
+}
+
+.cols3 {
+	width: 33%;
+	display:table-cell;
+}
+
+.cols4 {
+	width: 25%;
+	display:table-cell;
+}
+
+.cols5 {
+	width: 20%;
+	display:table-cell;
+}
+
+.cols6 {
+	width: 16.6%;
+	display:table-cell;
+}
+
+.graphPage {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-start;
 }
 
 hr.menu {
@@ -187,6 +224,10 @@ label {
 
 .nowrap {
 	white-space: nowrap;
+}
+
+.prewrap {
+	white-space: pre-wrap;
 }
 
 .wrap {
@@ -341,24 +382,6 @@ label {
 	cursor: pointer;
 	padding: 2px;
 	border: none;
-}
-
-.graphDrillDown {
-	vertical-align: top;
-	align-self: left;
-	z-index: 4;
-	padding: 3px;
-	height: 100%;
-	width: 22px;
-	min-width: 22px;
-}
-
-.iconWrapper {
-	display: none;
-}
-
-.drillDown {
-	cursor: pointer;
 }
 
 .monoSpace {
@@ -629,6 +652,7 @@ label {
 	background-color: #262626;
 	text-align: right;
 	padding: 4px;
+	padding-right: 14px;
 }
 
 .treeArea, .treeItemsArea {
@@ -642,7 +666,8 @@ label {
 }
 
 .filteredValue {
-	background-color: #F8D93D;
+	background-color: #979D0C;
+	color: black;
 }
 
 .graphItemGr1Alt1 {
@@ -703,6 +728,11 @@ label {
 	z-index: 4;
 }
 
+.cactiPageHead #tabs {
+	overflow-x: auto;
+	overflow-y: hidden;
+}
+
 .cactiGraphPageHeadBackdrop {
 	background: transparent url("./images/cacti_logo.svg") no-repeat scroll left 40% / 380px auto;
 	padding-bottom: 0px;
@@ -739,7 +769,7 @@ label {
 	width: 100%;
 	position: fixed;
 	padding: 4px;
-	top: 29px;
+	top: 27px;
 	left: 0px;
 	z-index: 4;
 	background: rgba(76,76,76,1);
@@ -890,17 +920,12 @@ ul#breadcrumbs {
 	display: block;
 }
 
-.tableRowGraph td {
-	padding: 3px 0px;
-}
-
 .tableRow {
-	line-height: 16px;
+	line-height: 22px;
 }
 
 .cactiConsoleNavigationArea {
 	background: #161616;
-	border-right: #aaaaaa 1px solid;
 	padding-left: 0px;
 	padding-right: 0px;
 	padding-top: 5px;
@@ -919,32 +944,40 @@ ul#breadcrumbs {
 
 .cactiLogo {
 	background: #161616 url('./images/cacti_logo.svg') no-repeat 30px;
-	display: block;
+	display: table;
 	cursor: pointer;
 	padding-bottom: 178px;
 	margin-bottom: 60px;
 	width: 146px;
-	margin-top: -6px;
+	margin-top: 10px;
 	margin-left: 2px;
 	margin-right: 2px;
 }
 
-.loginLeft, .logoutLeft {
-	width: 33%;
-	float: left;
+.cactiAuthLogo {
+	position: relative;
+	top: 0px;
+	left: 0px;
+	background: transparent url('./images/cacti_logo.svg') no-repeat center;
+	width: 130px;
+	height: 148px;
+	z-index: 2;
+	margin: -310px 0 0 290px;
 }
 
-.loginCenter, .logoutCenter {
+.cactiAuthCenter {
+	width: 350px;
+}
+
+.cactiAuthArea {
 	-moz-border-radius: 10px;
 	border-radius: 10px;
-	position: relative;
-	padding: 30px 0px 5px 20px;
-	background-color: snow;
+	padding: 15px;
+	background-color: white;
 	top: 30%;
-	max-width: 360px;
+	width: 360px;
 	max-height: 300px;
-	margin-left: auto;
-	margin-right: auto;
+	background: rgba(255,255,255,1);
 	background: -ms-linear-gradient(top, #363636 0%, #071204 100%);
 	background: -moz-linear-gradient(top, #363636 0%, #071204 100%);
 	background: -o-linear-gradient(top, #363636 0%, #071204 100%);
@@ -954,46 +987,37 @@ ul#breadcrumbs {
 	text-shadow: 1px 1px 1px rgba(9, 61, 16, 0.66);
 }
 
-.cactiLoginLogo, .cactiLogoutLogo {
-	position: relative;
-	float: right;
-	background: transparent url('./images/cacti_logo.svg') no-repeat center;
-	width: 120px;
-	height: 148px;
-	z-index: 2;
-	margin-top: -95px;
-	margin-left: 240px;
-	margin-bottom: -20px;
+.cactiAuthArea hr {
+	margin-right: 60px;
 }
 
-.loginArea, .logoutArea {
-	-moz-border-radius: 10px;
-	border-radius: 10px;
-	position: relative;
-	min-height: 200px;
+.cactiAuthTitle {
+	padding-top: 5px;
+	padding-bottom: 5px;
 }
 
-.cactiLoginTable td {
+.cactiAuthTable td {
 	padding-bottom: 6px;
 	padding-right: 6px;
+	white-space: nowrap;
 }
 
-.loginErrors, .logoutErrors {
+.cactiAuthErrors {
 	color: red;
-	min-height: 15px;
+	min-height: 20px;
 }
 
 legend {
 	font-size: 22px;
-	color: #bbbfc2;
+	font-weight: bold;
 }
 
-.loginRight, .logoutRight {
-	width: 33%;
-	float: right;
-}
-
-.loginBody, .logoutBody {
+.cactiAuthBody {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 100%;
+	height: 100%;
 	background: #161616;
 	background-image: -ms-linear-gradient(top, #161616 0%, #000000 100%);
 	background-image: -moz-linear-gradient(top, #161616 0%, #000000 100%);
@@ -1003,11 +1027,15 @@ legend {
 	background-image: linear-gradient(to bottom, #161616 0%, #000000 100%);
 }
 
+.cactiAuthPanel {
+	padding: 4px 0px;
+}
+
 .versionInfo {
-	padding-top: 5px;
+	padding-top: 15px;
+	margin-right: -10px;
 	float: right;
-	margin-top: 10px;
-	color: snow;
+	color: white;
 }
 
 .actionsDropdown {
@@ -1029,6 +1057,7 @@ legend {
 	float: right;
 	margin-left: 3px;
 	display: table-cell;
+	padding-right: 14px;
 }
 
 .actionsDropdownArrow {
@@ -1078,7 +1107,7 @@ legend {
 	display: inline-block;
 }
 
-.loginPanel {
+.cactiAuthPanel {
 	padding: 4px 0px;
 }
 
@@ -1136,6 +1165,10 @@ legend {
 	display: inline-block;
 }
 
+.piinstall, .pienable, .pidisable, .piuninstall, .pierror, .pirmdata, .piload, .pireadme, .pichangelog, .pirestore, .pirmarchive {
+	padding: 0px 3px !important;
+}
+
 .noLinkEditMain {
 	color: rgba(44,130,29,1);
 	text-decoration: none;
@@ -1143,10 +1176,6 @@ legend {
 	font-weight: normal;
 	padding: 3px;
 	white-space: nowrap;
-}
-
-.piinstall, .pienable, .pidisable, .piuninstall, .pierror {
-	padding: 0px 3px !important;
 }
 
 .linkEditMain, .linkEditMain:visited, .linkEditMain:active {
@@ -1310,11 +1339,8 @@ legend {
 }
 
 .cactiTableTitleRow {
-	float: left;
+	display: table-row;
 	text-align: left;
-	padding-left: 5px;
-	display: block;
-	width: 100%;
 	height: 22px;
 	line-height: 22px;
 	background: -webkit-gradient( linear, left top, left bottom, color-stop(0, #252426), color-stop(1, #0C0D0D));
@@ -1338,8 +1364,6 @@ legend {
 	float: left;
 	text-align: left;
 	padding-left: 5px;
-	display: block;
-	width: 70%;
 	height: 22px;
 	line-height: 22px;
 	background: -webkit-gradient( linear, left top, left bottom, color-stop(0, #252426), color-stop(1, #0C0D0D));
@@ -1353,9 +1377,7 @@ legend {
 .cactiTableButton {
 	float: right;
 	padding: 0px;
-	display: block;
 	text-align: right;
-	width: calc(30% - 5px);
 	height: 22px;
 	line-height: 22px;
 	white-space: nowrap;
@@ -1407,8 +1429,51 @@ legend {
 	white-space: nowrap;
 }
 
-.filterTable label {
+.filterTable td label {
 	vertical-align: 10%;
+}
+
+.filterTable .filterRow {
+	display: table-row;
+}
+
+.filterTable .filterColumn {
+	display: table-cell;
+	padding: 5px 0px 5px 5px;
+	text-align: left;
+}
+
+.filterTable .filterColumn label {
+	vertical-align: -10%;
+}
+
+.filterTable .filterColumnButton {
+	display: table-cell;
+	padding: 5px 0px 5px 5px;
+	text-align: left;
+}
+
+.filterTable .filterColumn:first-child {
+	width: 55px;
+}
+
+.settingsFilter {
+	display: table;
+	white-space: nowrap;
+}
+
+.settingsFilter div {
+	display: table-cell;
+	padding: 5px 0px 5px 5px;
+	vertical-align: middle;
+}
+
+.pingRow {
+	padding-left: 5px;
+	min-height: 50px;
+	vertical-align: text-top;
+	display: table-cell;
+	margin: 0px;
 }
 
 .formRow {
@@ -1441,6 +1506,24 @@ legend {
 	display: inline-block;
 	float: left;
 	text-align: left;
+}
+
+.confirm_actions .formColumnLeft {
+	min-width: 10%;
+	max-width: 45%;
+	width: initial;
+	display: table-cell;
+	float: initial;
+	vertical-align: middle;
+}
+
+.confirm_actions .formColumnRight {
+	display: table-cell;
+	float: initial;
+}
+
+.confirm_actions label {
+	white-space: wrap;
 }
 
 .formRadio {
@@ -1502,7 +1585,22 @@ legend {
 
 .formHeaderAnchor {
 	float: right;
-	padding-right: 8px;
+}
+
+.formConfirmRadio {
+	width: 10px;
+}
+
+.formConfirmRow {
+	margin: 3px;
+}
+
+.formConfirmRow td {
+	padding: 3px 8px;
+}
+
+.formConfirmRow td:first-child {
+	width: 1%;
 }
 
 .hostInfoHeader {
@@ -1627,7 +1725,6 @@ legend {
 
 .tableHeader th.sortable {
 	cursor: pointer !important;
-	line-height: 10px;
 }
 
 .tableHeader th.primarySort, th.tablesorter-headerDesc, th.tablesorter-headerAsc {
@@ -1644,13 +1741,12 @@ legend {
 	text-align: left;
 	font-size: 12px;
 	font-weight: normal;
-	padding: 4px !important;
-	line-height: 12px;
+	padding: 3px;
 }
 
 .tableHeader th div {
 	display: block;
-	padding-right: 8px;
+	padding-right: 0px;
 	font-size: 12px;
 	white-space: nowrap;
 }
@@ -1873,6 +1969,8 @@ legend {
 	vertical-align: middle;
 	text-decoration: none !important;
 	padding-right: 7px !important;
+	display: inline-block !important;
+	width: 14.75px !important;
 }
 
 .deleteMarker:hover {
@@ -1885,6 +1983,8 @@ legend {
 	vertical-align: middle;
 	text-decoration: none !important;
 	padding-right: 7px !important;
+	display: inline-block !important;
+	width: 14.75px !important;
 }
 
 .deleteMarkerDisabled:hover {
@@ -1893,9 +1993,9 @@ legend {
 
 .moveArrow {
 	color: #00438C !important;
-	display: inline-block;
-	width: 11.75px; !important;
 	font-size: 14px !important;
+	display: inline-block !important;
+	width: 14.75px !important;
 	vertical-align: middle;
 	text-decoration: none !important;
 }
@@ -1905,8 +2005,8 @@ legend {
 }
 
 .moveArrowNone {
-	display: inline-block;
-	width: 14.75px;
+	display: inline-block !important;
+	width: 14.75px !important;
 }
 
 .action, .shiftArrow, .calendar {
@@ -1961,8 +2061,16 @@ div#gtabs {
 	display: none;
 }
 
+.maintabs li span {
+	display: inline-block;
+}
+
 .ellipsis {
 	display: none;
+}
+
+#nav .menu_parent span {
+	padding-left: 5px;
 }
 
 .submenuoptions {
@@ -2017,11 +2125,9 @@ div#gtabs {
 }
 
 .tabs li, .maintabs li {
-	bottom: -1px;
 	float: left;
 	margin: 0 3px 0 0;
 	position: relative;
-	line-height: 14px;
 }
 
 .tabs li.current a, .maintabs li.current a {
@@ -2037,6 +2143,7 @@ div#gtabs {
 .tabs nav, .maintabs nav {
 	padding: 0 0 0 4px;
 	zoom: 1;
+	height: 25px;
 }
 
 .tabs nav:after, .maintabs nav:after {
@@ -2051,6 +2158,7 @@ div#gtabs {
 	list-style: none;
 	margin: 0;
 	padding: 0;
+	display: block;
 }
 
 /* Navigation Area */
@@ -2082,6 +2190,10 @@ th {
 }
 
 th:last-child {
+	border-right: none !important;
+}
+
+td:last-child {
 	border-right: none !important;
 }
 
@@ -2120,18 +2232,6 @@ tr td:last-child .checkbox {
 
 tr th:last-child .checkbox {
 	margin-right: 10px !important;
-}
-
-.fa-angle-double-up, .fa-angle-double-down {
-	margin-right: 10px;
-}
-
-.fa-plus, .fa-question-circle {
-	margin-right: 10px;
-}
-
-.fa-compress, .fa-expand {
-	margin-right: 10px;
 }
 
 #nav li a.pic:hover, #nav li a.selected {
@@ -2326,16 +2426,35 @@ tr#realtime td:first-child {
 }
 
 .menu_glyph {
-	font-size: 18px !important;
-	line-height: 18px;
-	float: middle;
+	font-size: 17px !important;
 	vertical-align: middle;
 	text-align: left;
-	width: 24px;
+	width: 22px;
+	padding-right: 0px !important;
+	display: inline-block;
+}
+
+.graphDrillDown {
+	display: inline-block;
+	vertical-align: top;
+	align-self: left;
+	z-index: 4;
+	padding: 3px;
+	height: 200px;
+	width: 22px;
+	min-width: 22px;
+}
+
+.iconWrapper {
+	display: none;
+}
+
+.drillDown {
+	cursor: pointer;
 }
 
 .graphWrapper {
-	position: relative;
+	display: inline-block;
 }
 
 .ui-autocomplete {
@@ -2408,8 +2527,17 @@ tr#realtime td:first-child {
 	font-size: unset;
 }
 
+.ui-widget-header {
+	background: transparent;
+	background-color: #161616;
+}
+
 .ui-checkboxradio-icon {
 	display: none;
+}
+
+.ui-selectmenu-search input {
+	width: 100%;
 }
 
 /* New Checkbox Stuff */
@@ -2614,65 +2742,65 @@ td.center > table {
 
 /*-- Tooltip --*/
 .bb-tooltip-container {
-  z-index: 10;
+	z-index: 10;
 }
 
 .bb-tooltip {
-  border-collapse: collapse;
-  border-spacing: 0;
-  background-color: #161616;
-  empty-cells: show;
-  -webkit-box-shadow: 7px 7px 12px -9px #777777;
-  -moz-box-shadow: 7px 7px 12px -9px #777777;
-  box-shadow: 7px 7px 12px -9px #777777;
-  opacity: 0.9;
+	border-collapse: collapse;
+	border-spacing: 0;
+	background-color: #161616;
+	empty-cells: show;
+	-webkit-box-shadow: 7px 7px 12px -9px #777777;
+	-moz-box-shadow: 7px 7px 12px -9px #777777;
+	box-shadow: 7px 7px 12px -9px #777777;
+	opacity: 0.9;
 }
 
 .bb-tooltip tr {
-  border: 1px solid #050505;
+	border: 1px solid #050505;
 }
 
 .bb-tooltip th {
-  background-color: #161616;
-  font-size: 14px;
-  padding: 2px 5px;
-  text-align: left;
-  color: #FFFFFF;
+	background-color: #161616;
+	font-size: 14px;
+	padding: 2px 5px;
+	text-align: left;
+	color: #FFFFFF;
 }
 
 .bb-tooltip td {
-  font-size: 13px;
-  padding: 3px 6px;
-  background-color: #050505;
-  border-left: 1px dotted #999;
+	font-size: 13px;
+	padding: 3px 6px;
+	background-color: #050505;
+	border-left: 1px dotted #999;
 }
 
 .bb-tooltip td > span {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-right: 6px;
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	margin-right: 6px;
 }
 
 .bb-tooltip td.value {
-  text-align: right;
+	text-align: right;
 }
 
 /*-- Chart --*/
 .bb svg {
-  font: 10px sans-serif;
-  -webkit-tap-highlight-color: transparent;
+	font: 10px sans-serif;
+	-webkit-tap-highlight-color: transparent;
 }
 
 .bb path, .bb line {
-  fill: none;
-  stroke: #E0E0E0;
+	fill: none;
+	stroke: #E0E0E0;
 }
 
 .bb text {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  user-select: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	user-select: none;
 }
 
 .bb-legend-item-tile,
@@ -2680,142 +2808,152 @@ td.center > table {
 .bb-ygrid,
 .bb-event-rect,
 .bb-bars path {
-  shape-rendering: crispEdges;
+	shape-rendering: crispEdges;
 }
 
 .bb-chart-arc path {
-  stroke: #fff;
+	stroke: #fff;
 }
 
 .bb-chart-arc text {
-  fill: #fff;
-  font-size: 13px;
+	fill: #fff;
+	font-size: 13px;
 }
 
 /*-- Axis --*/
 /*-- Grid --*/
 .bb-grid line {
-  stroke: #aaa;
+	stroke: #aaa;
 }
 
 .bb-grid text {
-  fill: #aaa;
+	fill: #aaa;
 }
 
 .bb-xgrid, .bb-ygrid {
-  stroke-dasharray: 3 3;
+	stroke-dasharray: 3 3;
 }
 
 /*-- Text on Chart --*/
 .bb-text.bb-empty {
-  fill: #808080;
-  font-size: 2em;
+	fill: #808080;
+	font-size: 2em;
 }
 
 /*-- Line --*/
 .bb-line {
-  stroke-width: 1px;
+	stroke-width: 1px;
 }
 
 /*-- Point --*/
 .bb-circle._expanded_ {
-  stroke-width: 1px;
-  stroke: white;
+	stroke-width: 1px;
+	stroke: white;
 }
 
 .bb-selected-circle {
-  fill: white;
-  stroke-width: 2px;
+	fill: white;
+	stroke-width: 2px;
 }
 
 /*-- Bar --*/
 .bb-bar {
-  stroke-width: 0;
+	stroke-width: 0;
 }
 
 .bb-bar._expanded_ {
-  fill-opacity: 0.75;
+	fill-opacity: 0.75;
 }
 
 /*-- Focus --*/
 .bb-target.bb-focused {
-  opacity: 1;
+	opacity: 1;
 }
 
 .bb-target.bb-focused path.bb-line, .bb-target.bb-focused path.bb-step {
-  stroke-width: 2px;
+	stroke-width: 2px;
 }
 
 .bb-target.bb-defocused {
-  opacity: 0.3 !important;
+	opacity: 0.3 !important;
 }
 
 /*-- Region --*/
 .bb-region {
-  fill: steelblue;
-  fill-opacity: .1;
+	fill: steelblue;
+	fill-opacity: .1;
 }
 
 /*-- Brush --*/
 .bb-brush .extent {
-  fill-opacity: .1;
+	fill-opacity: .1;
 }
 
 /*-- Select - Drag --*/
 /*-- Legend --*/
 .bb-legend-item {
-  font-size: 12px;
+	font-size: 12px;
 }
 
 .bb-legend-item-hidden {
-  opacity: 0.15;
+	opacity: 0.15;
 }
 
 .bb-legend-background {
-  opacity: 0.75;
-  fill: white;
-  stroke: lightgray;
-  stroke-width: 1;
+	opacity: 0.75;
+	fill: white;
+	stroke: lightgray;
+	stroke-width: 1;
 }
 
 /*-- Title --*/
 .bb-title {
-  font: 14px sans-serif;
+	font: 14px sans-serif;
 }
 
 /*-- Area --*/
 .bb-area {
-  stroke-width: 0;
-  opacity: 0.2;
+	stroke-width: 0;
+	opacity: 0.2;
 }
 
 /*-- Arc --*/
 .bb-chart-arcs-title {
-  dominant-baseline: middle;
-  font-size: 1.3em;
+	dominant-baseline: middle;
+	font-size: 1.3em;
 }
 
 .bb-chart-arcs .bb-chart-arcs-background {
-  fill: #E0E0E0;
-  stroke: none;
+	fill: #E0E0E0;
+	stroke: none;
 }
 
 .bb-chart-arcs .bb-chart-arcs-gauge-unit {
-  fill: #000;
-  font-size: 16px;
+	fill: #000;
+	font-size: 16px;
 }
 
 .bb-chart-arcs .bb-chart-arcs-gauge-max {
-  fill: #777;
+	fill: #777;
 }
 
 .bb-chart-arcs .bb-chart-arcs-gauge-min {
-  fill: #777;
+	fill: #777;
 }
 
 .bb-chart-arc .bb-gauge-value {
-  fill: #000;
-  /*  font-size: 28px !important;*/
+	fill: #000;
+	/*  font-size: 28px !important;*/
+}
+
+.bb-button .bb-zoom-reset {
+	font-size: 11px;
+	border: solid 1px #161616;
+	background-color: #161616;
+	padding: 5px;
+	color: snow;
+	border-radius: 5px;
+	cursor: pointer;
 }
 
 circle {
@@ -2824,12 +2962,100 @@ circle {
 	fill: transparent !important;
 }
 
-[id*='_edit'] .tableRowGraph:hover {
+[id*='_edit'] .tableHeader:hover {
 	background-color: rgba(0, 200, 200, .1) !important;
 	border-left: 2px solid yellow !important;
 	border-right: 2px solid yellow !important;
 }
 
-.tableRowGraph {
-	border: 2px solid rgba(0,0,0,0);
+.tableHeaderGraph {
+	display: table-row;
+	background: -moz-linear-gradient(top,  #45484d 0%, #000000 100%);
+	background: -webkit-linear-gradient(top,  #45484d 0%,#000000 100%);
+	background: -o-linear-gradient(top,  #45484d 0%,#000000 100%);
+	background: -ms-linear-gradient(top,  #45484d 0%,#000000 100%);
+	height: 24px;
+	vertical-align: middle;
 }
+
+.tableHeaderGraph span {
+	padding: 5px;
+	line-height: 22px;
+}
+
+.actionHelp {
+	color:#00758F !important;
+}
+
+.plusAdd {
+	color:#CE3500 !important;
+}
+
+.actionCog {
+	color:#FDAC53 !important;
+}
+
+.fileCSV {
+	color:#9BB7D4 !important;
+}
+
+.threeBars {
+	color:#B55A30 !important;
+}
+
+.editDevice {
+	color:#F5DF4D !important;
+}
+
+.editTemplate {
+	color:#0072B5 !important;
+}
+
+.realTime {
+	color:#A0DAA9 !important;
+}
+
+.spikeKill {
+	color:#E9897E !important;
+}
+
+.newDevice {
+	color:#00A170 !important;
+}
+
+.newGraph {
+	color:#926AA6 !important;
+}
+
+.reindexDevice {
+	color:#D2386C !important;
+}
+
+.enableDebug {
+	color:#363945 !important;
+}
+
+.disableDebug {
+	color:#939597 !important;
+}
+
+.repopulateCache {
+	color:#EFE1CE !important;
+}
+
+.viewCache {
+	color:#E0B589 !important;
+}
+
+.viewGraphs {
+	color:#9A8B4F !important;
+}
+
+.viewSources {
+	color:#56C6A9 !important;
+}
+
+.expandAggregate {
+	color:#9BB7D4 !important;
+}
+

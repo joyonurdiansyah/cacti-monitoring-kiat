@@ -22,15 +22,20 @@
  +-------------------------------------------------------------------------+
 */
 
-/* update_data_source_title_cache_from_template - updates the title cache for all data sources
-	that match a given data template
-   @arg $data_template_id - (int) the ID of the data template to match */
-function update_data_source_title_cache_from_template($data_template_id) {
+/**
+ * update_data_source_title_cache_from_template - updates the title cache for all data sources
+ * that match a given data template
+ *
+ * @param int $data_template_id The ID of the data template to match
+ *
+ * @return void
+ */
+function update_data_source_title_cache_from_template(int $data_template_id) : void {
 	$data = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' local_data_id
 		FROM data_template_data
 		WHERE data_template_id = ?
 		AND local_data_id > 0',
-		array($data_template_id));
+		[$data_template_id]);
 
 	if (cacti_sizeof($data)) {
 		foreach ($data as $item) {
@@ -39,16 +44,21 @@ function update_data_source_title_cache_from_template($data_template_id) {
 	}
 }
 
-/* update_data_source_title_cache_from_query - updates the title cache for all data sources
-	that match a given data query/index combination
-   @arg $snmp_query_id - (int) the ID of the data query to match
-   @arg $snmp_index - the index within the data query to match */
-function update_data_source_title_cache_from_query($snmp_query_id, $snmp_index) {
+/**
+ * update_data_source_title_cache_from_query - updates the title cache for all data sources
+ * that match a given data query/index combination
+ *
+ * @param int    $snmp_query_id The ID of the data query to match
+ * @param string $snmp_index    The index within the data query to match
+ *
+ * @return void
+ */
+function update_data_source_title_cache_from_query(int $snmp_query_id, string $snmp_index) : void {
 	$data = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' id
 		FROM data_local
 		WHERE snmp_query_id = ?
 		AND snmp_index = ?',
-		array($snmp_query_id, $snmp_index));
+		[$snmp_query_id, $snmp_index]);
 
 	if (cacti_sizeof($data) > 0) {
 		foreach ($data as $item) {
@@ -57,28 +67,35 @@ function update_data_source_title_cache_from_query($snmp_query_id, $snmp_index) 
 	}
 }
 
-/* update_data_source_title_cache_from_host - updates the title cache for all data sources
-	that match a given host
-   @arg $host_id - (int) the ID of the host to match */
-function update_data_source_title_cache_from_host($host_id, $query_id = 0, $ids = array()) {
+/**
+ * update_data_source_title_cache_from_host - updates the title cache for all data sources
+ * that match a given host
+ *
+ * @param int   $host_id  The ID of the host to match
+ * @param int   $query_id The ID of the snmp query
+ * @param array $ids      An array of local data ids
+ *
+ * @return void
+ */
+function update_data_source_title_cache_from_host(int $host_id, int $query_id = 0, array $ids = []) : void {
 	if ($query_id > 0 && !cacti_sizeof($ids)) {
-	$data = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' id
+		$data = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' id
 		FROM data_local
 			WHERE host_id = ?
 			AND snmp_query_id = ?',
-			array($host_id, $query_id));
+			[$host_id, $query_id]);
 	} elseif ($query_id > 0) {
 		$data = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' id
 			FROM data_local
 			WHERE host_id = ?
 			AND snmp_query_id = ?
 			AND id IN (?)',
-			array($host_id, $query_id, implode(',', $ids)));
+			[$host_id, $query_id, implode(',', $ids)]);
 	} else {
 		$data = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' id
 			FROM data_local
 			WHERE host_id = ?',
-			array($host_id));
+			[$host_id]);
 	}
 
 	if (cacti_sizeof($data)) {
@@ -88,22 +105,27 @@ function update_data_source_title_cache_from_host($host_id, $query_id = 0, $ids 
 	}
 }
 
-/* update_data_source_title_cache - updates the title cache for a single data source
-   @arg $local_data_id - (int) the ID of the data source to update the title cache for */
-function update_data_source_title_cache($local_data_id) {
+/**
+ * update_data_source_title_cache - updates the title cache for a single data source
+ *
+ * @param int $local_data_id The ID of the data source to update the title cache for
+ *
+ * @return void
+ */
+function update_data_source_title_cache(int $local_data_id) : void {
 	$old_title = db_fetch_cell_prepared('SELECT name_cache
 		FROM data_template_data
 		WHERE local_data_id = ?',
-		array($local_data_id));
-	
+		[$local_data_id]);
+
 	$data_source = get_data_source_title($local_data_id);
 
-	if (strstr($data_source, '|query_') !== false || strstr($data_source, '|host_') !== false) {
+	if (str_contains($data_source, '|query_') || str_contains($data_source, '|host_')) {
 		if ($old_title == '') {
 			db_execute_prepared('UPDATE data_template_data
 				SET name_cache = ?
 				WHERE local_data_id = ?',
-				array($data_source, $local_data_id));
+				[$data_source, $local_data_id]);
 
 			api_plugin_hook_function('update_data_source_title_cache', $local_data_id);
 		}
@@ -111,21 +133,26 @@ function update_data_source_title_cache($local_data_id) {
 		db_execute_prepared('UPDATE data_template_data
 			SET name_cache = ?
 			WHERE local_data_id = ?',
-			array($data_source, $local_data_id));
+			[$data_source, $local_data_id]);
 
 		api_plugin_hook_function('update_data_source_title_cache', $local_data_id);
 	}
 }
 
-/* update_graph_title_cache_from_template - updates the title cache for all graphs
-	that match a given graph template
-   @arg $graph_template_id - (int) the ID of the graph template to match */
-function update_graph_title_cache_from_template($graph_template_id) {
+/**
+ * update_graph_title_cache_from_template - updates the title cache for all graphs
+ * that match a given graph template
+ *
+ * @param int $graph_template_id The ID of the graph template to match
+ *
+ * @return void
+ */
+function update_graph_title_cache_from_template(int $graph_template_id) : void {
 	$graphs = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' local_graph_id
 		FROM graph_templates_graph
 		WHERE graph_template_id = ?
 		AND local_graph_id > 0',
-		array($graph_template_id));
+		[$graph_template_id]);
 
 	if (cacti_sizeof($graphs) > 0) {
 		foreach ($graphs as $item) {
@@ -134,16 +161,21 @@ function update_graph_title_cache_from_template($graph_template_id) {
 	}
 }
 
-/* update_graph_title_cache_from_query - updates the title cache for all graphs
-	that match a given data query/index combination
-   @arg $snmp_query_id - (int) the ID of the data query to match
-   @arg $snmp_index - the index within the data query to match */
-function update_graph_title_cache_from_query($snmp_query_id, $snmp_index) {
+/**
+ * update_graph_title_cache_from_query - updates the title cache for all graphs
+ * that match a given data query/index combination
+ *
+ * @param int    $snmp_query_id The ID of the data query to match
+ * @param string $snmp_index    The index within the data query to match
+ *
+ * @return void
+ */
+function update_graph_title_cache_from_query(int $snmp_query_id, string $snmp_index) : void {
 	$graphs = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' id
 		FROM graph_local
 		WHERE snmp_query_id = ?
 		AND snmp_index = ?',
-		array($snmp_query_id, $snmp_index));
+		[$snmp_query_id, $snmp_index]);
 
 	if (cacti_sizeof($graphs) > 0) {
 		foreach ($graphs as $item) {
@@ -152,16 +184,23 @@ function update_graph_title_cache_from_query($snmp_query_id, $snmp_index) {
 	}
 }
 
-/* update_graph_title_cache_from_host - updates the title cache for all graphs
-	that match a given host
-   @arg $host_id - (int) the ID of the host to match */
-function update_graph_title_cache_from_host($host_id, $query_id = 0, $ids = array()) {
+/**
+ * update_graph_title_cache_from_host - updates the title cache for all graphs
+ * that match a given host
+ *
+ * @param int   $host_id  The ID of the host to match
+ * @param int   $query_id The ID of the data query to match
+ * @param array $ids      An array of local_data_ids
+ *
+ * @return void
+ */
+function update_graph_title_cache_from_host(int $host_id, int $query_id = 0, array $ids = []) : void {
 	if ($query_id > 0 && !cacti_sizeof($ids)) {
-	$graphs = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' id
+		$graphs = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' id
 		FROM graph_local
 			WHERE host_id = ?
 			AND snmp_query_id = ?',
-			array($host_id, $query_id));
+			[$host_id, $query_id]);
 	} elseif ($query_id > 0) {
 		$graphs = db_fetch_assoc_prepared('SELECT DISTINCT ' . SQL_NO_CACHE . ' gl.id
 			FROM graph_local AS gl
@@ -172,12 +211,12 @@ function update_graph_title_cache_from_host($host_id, $query_id = 0, $ids = arra
 			WHERE host_id = ?
 			AND snmp_query_id = ?
 			AND dtr.local_data_id IN(?)',
-			array($host_id, $query_id, implode(',', $ids)));
+			[$host_id, $query_id, implode(',', $ids)]);
 	} else {
 		$graphs = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' id
 			FROM graph_local
 			WHERE host_id = ?',
-			array($host_id));
+			[$host_id]);
 	}
 
 	if (cacti_sizeof($graphs)) {
@@ -187,35 +226,45 @@ function update_graph_title_cache_from_host($host_id, $query_id = 0, $ids = arra
 	}
 }
 
-/* update_graph_title_cache - updates the title cache for a single graph
-   @arg $local_graph_id - (int) the ID of the graph to update the title cache for */
-function update_graph_title_cache($local_graph_id) {
+/**
+ * update_graph_title_cache - updates the title cache for a single graph
+ *
+ * @param int $local_graph_id The ID of the graph to update the title cache for
+ *
+ * @return void
+ */
+function update_graph_title_cache(int $local_graph_id) : void {
 	$old_title = db_fetch_cell_prepared('SELECT title_cache
 		FROM graph_templates_graph
 		WHERE local_graph_id = ?',
-		array($local_graph_id));
+		[$local_graph_id]);
 
 	$graph_title = get_graph_title($local_graph_id);
 
-	if (strstr($graph_title, '|query_') !== false || strstr($graph_title, '|host_') !== false) {
+	if (str_contains($graph_title, '|query_') || str_contains($graph_title, '|host_')) {
 		if ($old_title == '') {
 			db_execute_prepared('UPDATE graph_templates_graph
 				SET title_cache = ?
 				WHERE local_graph_id = ?',
-				array($graph_title, $local_graph_id));
+				[$graph_title, $local_graph_id]);
 		}
 	} else {
 		db_execute_prepared('UPDATE graph_templates_graph
 			SET title_cache = ?
 			WHERE local_graph_id = ?',
-			array($graph_title, $local_graph_id));
+			[$graph_title, $local_graph_id]);
 	}
 }
 
-/* null_out_substitutions - takes a string and cleans out any host variables that do not have values
-   @arg $string - the string to clean out unsubstituted variables for
-   @returns - the cleaned up string */
-function null_out_substitutions($string) {
+/**
+ * null_out_substitutions - takes a string and cleans out any host variables that
+ * do not have values.
+ *
+ * @param string $string The string to clean out unsubstituted variables for
+ *
+ * @return string The cleaned up string
+ */
+function null_out_substitutions(string $string) : string {
 	if ($string != '') {
 		return preg_replace("/\|host_" . VALID_HOST_FIELDS . "\|( - )?/i", '', $string);
 	} else {
@@ -223,17 +272,22 @@ function null_out_substitutions($string) {
 	}
 }
 
-/* expand_title - takes a string and substitutes all data query variables contained in it or cleans
-	them out if no data query is in use
-   @arg $host_id - (int) the host ID to match
-   @arg $snmp_query_id - (int) the data query ID to match
-   @arg $snmp_index - the data query index to match
-   @arg $title - the original string that contains the data query variables
-   @returns - the original string with all of the variable substitutions made */
-function expand_title($host_id, $snmp_query_id, $snmp_index, $title) {
+/**
+ * expand_title - takes a string and substitutes all data query variables contained
+ * in it or cleans them out if no data query is in use.
+ *
+ * @param int    $host_id       The host ID to match
+ * @param int    $snmp_query_id The data query ID to match
+ * @param string $snmp_index    The data query index to match
+ * @param string $title         The original string that contains the data query variables
+ *
+ * @return string The original string with all of the variable substitutions made
+ */
+function expand_title(int $host_id, int $snmp_query_id, string $snmp_index, string $title) : string {
 	if ((strstr($title, '|')) && (!empty($host_id))) {
 		if (($snmp_query_id != '0') && ($snmp_index != '')) {
-			$title = substitute_snmp_query_data(null_out_substitutions(substitute_host_data($title, '|', '|', $host_id)), $host_id, $snmp_query_id, $snmp_index, read_config_option('max_data_query_field_length'));
+			$max_chars = intval(read_config_option('max_data_query_field_length'));
+			$title     = substitute_snmp_query_data(null_out_substitutions(substitute_host_data($title, '|', '|', $host_id)), $host_id, $snmp_query_id, $snmp_index, $max_chars);
 		} else {
 			$title = null_out_substitutions(substitute_host_data($title, '|', '|', $host_id));
 		}
@@ -241,14 +295,15 @@ function expand_title($host_id, $snmp_query_id, $snmp_index, $title) {
 		$title = null_out_substitutions($title);
 	}
 
-	$data = array(
+	$data = [
 		'host_id'       => $host_id,
 		'snmp_query_id' => $snmp_query_id,
 		'snmp_index'    => $snmp_index,
 		'title'         => $title
-	);
+	];
 
 	$data = api_plugin_hook_function('expand_title', $data);
+
 	if (isset($data['title'])) {
 		$title = $data['title'];
 	}
@@ -256,43 +311,50 @@ function expand_title($host_id, $snmp_query_id, $snmp_index, $title) {
 	return $title;
 }
 
-/* substitute_script_query_path - takes a string and substitutes all path variables contained in it
-   @arg $path - the string to make path variable substitutions on
-   @returns - the original string with all of the variable substitutions made */
-function substitute_script_query_path($path) {
-	global $config;
-
-	$path = clean_up_path(str_replace('|path_cacti|', $config['base_path'], $path));
+/**
+ * substitute_script_query_path - takes a string and substitutes all path
+ * variables contained in it.
+ *
+ * @param string $path The string to make path variable substitutions on
+ *
+ * @return string The original string with all of the variable substitutions made
+ */
+function substitute_script_query_path(string $path) : string {
+	$path = clean_up_path(str_replace('|path_cacti|', CACTI_PATH_BASE, $path));
 	$path = clean_up_path(str_replace('|path_php_binary|', read_config_option('path_php_binary'), $path));
 
 	return $path;
 }
 
-/* substitute_host_data - takes a string and substitutes all host variables contained in it
-   @arg $string - the string to make host variable substitutions on
-   @arg $l_escape_string - the character used to escape each variable on the left side
-   @arg $r_escape_string - the character used to escape each variable on the right side
-   @arg $host_id - (int) the host ID to match
-   @returns - the original string with all of the variable substitutions made */
-function substitute_host_data($string, $l_escape_string, $r_escape_string, $host_id) {
+/**
+ * substitute_host_data - takes a string and substitutes all host variables contained in it
+ *
+ * @param string $string          The string to make host variable substitutions on
+ * @param string $l_escape_string The character used to escape each variable on the left side
+ * @param string $r_escape_string The character used to escape each variable on the right side
+ * @param int    $host_id         The host ID to match
+ *
+ * @return string The original string with all of the variable substitutions made
+ */
+function substitute_host_data(string $string, string $l_escape_string, string $r_escape_string, int $host_id) : string {
 	if (!empty($host_id)) {
 		$host = db_fetch_row_prepared('SELECT ' . SQL_NO_CACHE . ' h.*, s.name AS site_name
 			FROM host AS h
 			LEFT JOIN sites AS s
 			ON h.site_id = s.id
-			WHERE h.id = ?', array($host_id));
+			WHERE h.id = ?', [$host_id]);
 
 		if (!cacti_sizeof($host)) {
 			return $string;
 		}
 
-		$search  = array();
-		$replace = array();
+		$search  = [];
+		$replace = [];
 
-		$search[]  = $l_escape_string . 'host_management_ip' . $r_escape_string; /* for compatibility */
-		$replace[] = $host['hostname']; /* for compatibility */
+		$search[]  = $l_escape_string . 'host_management_ip' . $r_escape_string; // for compatibility
+		$replace[] = $host['hostname']; // for compatibility
 
-		/* common host columns */
+		// common host columns
 		$search[]  = $l_escape_string . 'host_id' . $r_escape_string;
 		$replace[] = $host['id'];
 		$search[]  = $l_escape_string . 'host_hostname' . $r_escape_string;
@@ -305,6 +367,8 @@ function substitute_host_data($string, $l_escape_string, $r_escape_string, $host
 		$replace[] = $host['notes'];
 		$search[]  = $l_escape_string . 'host_location' . $r_escape_string;
 		$replace[] = $host['location'];
+		$search[]  = $l_escape_string . 'host_poller_id' . $r_escape_string;
+		$replace[] = $host['poller_id'];
 		$search[]  = $l_escape_string . 'host_polling_time' . $r_escape_string;
 		$replace[] = $host['polling_time'];
 		$search[]  = $l_escape_string . 'host_avg_time' . $r_escape_string;
@@ -316,7 +380,7 @@ function substitute_host_data($string, $l_escape_string, $r_escape_string, $host
 		$search[]  = $l_escape_string . 'host_uptime' . $r_escape_string;
 		$replace[] = get_uptime($host);
 
-		/* snmp connectivity information */
+		// snmp connectivity information
 		$search[]  = $l_escape_string . 'host_snmp_community' . $r_escape_string;
 		$replace[] = $host['snmp_community'];
 		$search[]  = $l_escape_string . 'host_snmp_version' . $r_escape_string;
@@ -340,7 +404,7 @@ function substitute_host_data($string, $l_escape_string, $r_escape_string, $host
 		$search[]  = $l_escape_string . 'host_snmp_timeout' . $r_escape_string;
 		$replace[] = $host['snmp_timeout'];
 
-		/* snmp system information */
+		// snmp system information
 		$search[]  = $l_escape_string . 'host_snmp_sysDescr' . $r_escape_string;
 		$replace[] = $host['snmp_sysDescr'];
 		$search[]  = $l_escape_string . 'host_snmp_sysObjectID' . $r_escape_string;
@@ -359,7 +423,7 @@ function substitute_host_data($string, $l_escape_string, $r_escape_string, $host
 		$search[]  = $l_escape_string . 'host_max_oids' . $r_escape_string;
 		$replace[] = $host['max_oids'];
 
-		/* handle the external id */
+		// handle the external id
 		$search[]  = $l_escape_string . 'host_external_id' . $r_escape_string;
 		$replace[] = $host['external_id'];
 
@@ -367,7 +431,7 @@ function substitute_host_data($string, $l_escape_string, $r_escape_string, $host
 
 		$temp = api_plugin_hook_function(
 			'substitute_host_data',
-			array('string' => $string, 'l_escape_string' => $l_escape_string, 'r_escape_string' => $r_escape_string, 'host_id' => $host_id)
+			['string' => $string, 'l_escape_string' => $l_escape_string, 'r_escape_string' => $r_escape_string, 'host_id' => $host_id]
 		);
 
 		$string = $temp['string'];
@@ -376,28 +440,33 @@ function substitute_host_data($string, $l_escape_string, $r_escape_string, $host
 	return $string;
 }
 
-/* substitute_snmp_query_data - takes a string and substitutes all data query variables contained in it
-   @arg $string - the original string that contains the data query variables
-   @arg $host_id - (int) the host ID to match
-   @arg $snmp_query_id - (int) the data query ID to match
-   @arg $snmp_index - the data query index to match
-   @arg $max_chars - the maximum number of characters to substitute
-   @returns - the original string with all of the variable substitutions made */
-function substitute_snmp_query_data($string, $host_id, $snmp_query_id, $snmp_index, $max_chars = 0) {
+/**
+ * substitute_snmp_query_data - takes a string and substitutes all data query
+ * variables contained in it.
+ *
+ * @param string $string        The origina string that contains the data query variables
+ * @param int    $host_id       The host ID to match
+ * @param int    $snmp_query_id The data query ID to match
+ * @param string $snmp_index    The data query index to match
+ * @param int    $max_chars     The maximum number of characters to substitute
+ *
+ * @return string The original string with all of the variable substitutions made
+ */
+function substitute_snmp_query_data(string $string, int $host_id, int $snmp_query_id, string $snmp_index, int $max_chars = 0) : string {
 	if ($host_id > 0) {
 		$snmp_cache_data = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' field_name, field_value
 			FROM host_snmp_cache
 			WHERE host_id = ?
 			AND snmp_query_id = ?
 			AND snmp_index = ?',
-			array($host_id, $snmp_query_id, $snmp_index));
+			[$host_id, $snmp_query_id, $snmp_index]);
 	} else {
 		$snmp_cache_data = db_fetch_assoc_prepared('SELECT DISTINCT ' . SQL_NO_CACHE . ' field_name, field_value
 			FROM host_snmp_cache
 			WHERE snmp_query_id = ?
 			AND snmp_index = ?
 			AND host_id = 0',
-			array($snmp_query_id, $snmp_index));
+			[$snmp_query_id, $snmp_index]);
 	}
 
 	if (cacti_sizeof($snmp_cache_data)) {
@@ -409,7 +478,7 @@ function substitute_snmp_query_data($string, $host_id, $snmp_query_id, $snmp_ind
 
 				$string = stri_replace('|query_' . $data['field_name'] . '|', $data['field_value'], $string);
 
-				if (strpos($string, 'query_') === false) {
+				if (!str_contains($string, 'query_')) {
 					break;
 				}
 			}
@@ -419,19 +488,25 @@ function substitute_snmp_query_data($string, $host_id, $snmp_query_id, $snmp_ind
 	return $string;
 }
 
-/* substitute_data_input_data - takes a string and substitutes all data input variables contained in it
-   @arg $string - the original string that contains the data input variables
-   @arg $local_data_id - (int) the local data id to match
-   @arg $max_chars - the maximum number of characters to substitute
-   @returns - the original string with all of the variable substitutions made */
-function substitute_data_input_data($string, $graph, $local_data_id, $max_chars = 0) {
+/**
+ * substitute_data_input_data - takes a string and substitutes all data input
+ * variables contained in it.
+ *
+ * @param string $string        The original string that contains the data input variables
+ * @param array  $graph         The local data id to match
+ * @param int    $local_data_id The maximum number of characters to substitute
+ * @param int    $max_chars     The maximum number of characters to process
+ *
+ * @return string The original string with all of the variable substitutions made
+ */
+function substitute_data_input_data(string $string, array $graph, int $local_data_id, int $max_chars = 0) : string {
 	if (empty($local_data_id)) {
 		if (isset($graph['local_graph_id'])) {
 			$local_data_ids = array_rekey(db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . ' DISTINCT local_data_id
 				FROM data_template_rrd
 				INNER JOIN graph_templates_item
 				ON data_template_rrd.id = graph_templates_item.task_item_id
-				WHERE local_graph_id = ?', array($graph['local_graph_id'])), 'local_data_id', 'local_data_id');
+				WHERE local_graph_id = ?', [$graph['local_graph_id']]), 'local_data_id', 'local_data_id');
 
 			if (cacti_sizeof($local_data_ids)) {
 				$data_template_data_id = db_fetch_cell('SELECT ' . SQL_NO_CACHE . ' id
@@ -447,18 +522,18 @@ function substitute_data_input_data($string, $graph, $local_data_id, $max_chars 
 		$data_template_data_id = db_fetch_cell_prepared('SELECT ' . SQL_NO_CACHE . ' id
 			FROM data_template_data
 			WHERE local_data_id = ?',
-			array($local_data_id));
+			[$local_data_id]);
 	}
 
 	if (!empty($data_template_data_id)) {
-		$data = db_fetch_assoc_prepared("SELECT " . SQL_NO_CACHE . "
+		$data = db_fetch_assoc_prepared('SELECT ' . SQL_NO_CACHE . "
 			dif.data_name, did.value
 			FROM data_input_fields AS dif
 			INNER JOIN data_input_data AS did
 			ON dif.id = did.data_input_field_id
 			WHERE data_template_data_id = ?
 			AND input_output = 'in'",
-			array($data_template_data_id));
+			[$data_template_data_id]);
 
 		if (cacti_sizeof($data)) {
 			foreach ($data as $item) {
@@ -476,3 +551,120 @@ function substitute_data_input_data($string, $graph, $local_data_id, $max_chars 
 	return $string;
 }
 
+/**
+ * substitute_poller_data - takes a string and substitutes all data input
+ * variables contained in it.
+ *
+ * @param string $string        The original string that contains the data input variables
+ * @param array  $graph         The local data id to match
+ * @param int    $local_data_id The maximum number of characters to substitute
+ * @param int    $max_chars     The maximum number of characters to process
+ *
+ * @return string the original string with all of the variable substitutions made
+ */
+function substitute_poller_data(string $string, array $graph, int $local_data_id, int $max_chars = 0) : string {
+	if (empty($local_data_id)) {
+		if (isset($graph['local_graph_id'])) {
+			$poller = db_fetch_row_prepared('SELECT p.*
+				FROM host AS h
+				INNER JOIN poller AS p
+				ON h.poller_id = p.id
+				WHERE h.id = ?',
+				[$graph['host_id']]);
+
+			if (!cacti_sizeof($poller)) {
+				return $string;
+			}
+
+			$columns = array_keys($poller);
+
+			foreach ($columns as $c) {
+				if (str_contains($string, '|poller_' . $c . '|')) {
+					$string = stri_replace('|poller_' . $c . '|', $poller[$c], $string);
+				}
+			}
+		}
+	} else {
+		$poller = db_fetch_row_prepared('SELECT p.*
+			FROM host AS h
+			INNER JOIN data_local AS dl
+			ON h.id = dl.host_id
+			INNER JOIN poller AS p
+			ON h.poller_id = p.id
+			WHERE dl.id = ?',
+			[$local_data_id]);
+
+		if (!cacti_sizeof($poller)) {
+			return $string;
+		}
+
+		$columns = array_keys($poller);
+
+		foreach ($columns as $c) {
+			if (str_contains($string, '|poller_' . $c . '|')) {
+				$string = stri_replace('|poller_' . $c . '|', $poller[$c], $string);
+			}
+		}
+	}
+
+	return $string;
+}
+
+/**
+ * substitute_site_data - takes a string and substitutes all data input
+ * variables contained in it.
+ *
+ * @param string $string        The original string that contains the data input variables
+ * @param array  $graph         The Cacti graph object
+ * @param int    $local_data_id The local data id to match
+ * @param int    $max_chars     The maximum number of characters to substitute
+ *
+ * @return string The original string with all of the variable substitutions made
+ */
+function substitute_site_data(string $string, array $graph, int $local_data_id, int $max_chars = 0) : string {
+	if (empty($local_data_id)) {
+		if (isset($graph['local_graph_id'])) {
+			$site = db_fetch_row_prepared('SELECT s.*
+				FROM host AS h
+				INNER JOIN sites AS s
+				ON h.site_id = s.id
+				WHERE h.id = ?',
+				[$graph['host_id']]);
+
+			if (!cacti_sizeof($site)) {
+				return $string;
+			}
+
+			$columns = array_keys($site);
+
+			foreach ($columns as $c) {
+				if (str_contains($string, '|site_' . $c . '|')) {
+					$string = stri_replace('|site_' . $c . '|', $site[$c], $string);
+				}
+			}
+		}
+	} else {
+		$site = db_fetch_row_prepared('SELECT s.*
+			FROM host AS h
+			INNER JOIN data_local AS dl
+			ON h.id = dl.host_id
+			INNER JOIN sites AS s
+			ON h.site_id = s.id
+			WHERE dl.id = ?',
+			[$local_data_id]);
+
+		if (!cacti_sizeof($site)) {
+			return $string;
+		}
+
+		$columns = array_keys($site);
+
+		foreach ($columns as $c) {
+			if (str_contains($string, '|site_' . $c . '|')) {
+				$string = stri_replace('|site_' . $c . '|', $site[$c], $string);
+			}
+		}
+	}
+
+	return $string;
+}

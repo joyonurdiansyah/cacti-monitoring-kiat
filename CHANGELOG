@@ -1,133 +1,335 @@
 Cacti CHANGELOG
 
+1.3.0-dev
+-feature: Harden authentication system correctness including 2FA logic, password reset token security, and basic auth status checks
+-feature: Extract remote agent reverse DNS forward-confirmation into the remote_agent_fcrdns_confirmed() helper
+-issue#7131: Fix data_input_data column-expansion bugs in change_data_template and api_data_source_duplicate
+-issue#7137: Fix eleven PHPStan Level 6 errors in form_save error-redirect URLs and lib/html.php right-tab block
+-issue#6762: Harden lib/ping.php: apply cacti_escapeshellarg() to hostname in native ping and fping shell commands
+-issue#6760: Harden link.php: apply sanitize_uri() to HTTP_REFERER before redirect
+-issue#6761: Harden auth_changepassword.php: apply sanitize_uri() to HTTP_REFERER in all redirect paths
+-issue: Fix loose $db_conn comparison in db_table_exists and db_column_exists
+-issue#6545: Add 30 and 60 second timeout options for Remote Agent and Poller settings
+-issue#6682: Fix column exclusion silently skipping first element due to loose array_search comparison
+-issue#6210: Fix Error: You have an error in your SQL syntax due to using table field without backtick.
+-issue#6165: Update billboard.js and billboard.css to resolve servcheck graph legend overlapping issue.
+-issue#2205: Allow admins to disable RRDtool watermark
+-issue#3066: Enable the secure flag on cookies when HTTPS is enabled.
+-issue#3074: ss_net_snmp_disk_bytes.php and ss_net_snmp_disk_io.php do now report mmcblk data.
+-issue#3141: Fix FreeBSD IPv6 ping
+-issue#3547: Database Audit utility does not check database permissions
+-issue#3559: When a developer uses backtracing, HTML output can be seen from command line
+-issue#3560: When using `input_validate_xxx`, calls to `die_html_input_error()` do not pass variable name
+-issue#5019: Install SQL Statements with Database name should be quoted
+-issue#5191: Improve poller recovery by the addition of a secondary index
+-issue#5216: 1.3.0 - QA DSSTATS does not use the RRDtool Proxy stateful socket connection
+-issue#5221: ss_fping.php script times out when there is a lot of packet loss
+-issue#5264: The Net-SNMP Disk I/O Templates are not Cluster Aware
+-issue#5481: Attempting to edit a Data Query that does not exist throws warnings and not an GUI error
+-issue#5511: Allow automation network to be saved when the IP Addresses to ignore box is empty
+-issue#5517: Cacti 1.3.x will not support 'Remember me' functionality without using https
+-issue#5567: Incorrect variable name in change_device cli script
+-issue#5570: RRDChecker is started very often
+-issue#5573: Incorrect URL for editing graph template
+-issue#5639: Add tooltip info about IPv6 address
+-issue#5657: Consolidation Functions must be available in COMMENT for nth percentile and bandwidth summations comment types
+-issue#5680: Fix Spikekill not following correct time in schedule
+-issue#5776: Undefined array key "description" in file settings.php
+-issue#5844: Automation fails when using MySQL 8
+-issue#5885: Fix Fortigate and Aruba OSCX switch template, improve Clearpass template
+-issue#5899: Tooltip remain on page after page is refreshed
+-issue#5900: Please add the ability to select compiled RRDtool v1.9+
+-issue#5936: If a Remote Data Collector has not devices, poller.php does not properly register any collectors
+-issue#5964: Graph Timespans too far into the past generate RRDtool crashes
+-issue#5967: Removing dygraph-combined.js as we are not using it and have adequate charting libraries
+-issue#5968: Removing jQuery Sparklines API as we are not using it and have adequate charting libraries
+-issue#5969: If System Level Browser TimeZone Support is disabled don't show the User Profile Option
+-issue#5973: Multiple Issues with database API function db_update_table() preventing correct update of an existing table
+-issue#6177: autodiscovery use dns name in description field
+-issue#6240: Fix sorting exception in rrdtool_function_create function
+-issue#6255: Fix not showing any graphs in the subtree if there are only graphs without devices
+-issue#6258: Rename 'Data' to 'Data/Statistics' per customer request
+-feature#412: Import Export for Graph and Tree rules
+-feature#1214: Move Tree Create/Remove/Modify Functions to lib/api_tree.php
+-feature#1361: UI should update alternate row colors
+-feature#1398: Implement an interactive web based Plugin upgrade process
+-feature#1442: Add validation to GUI inputs
+-feature#1523: Value above RRD maximum value
+-feature#1585: Confirmation screen should show what options have been picked
+-feature#1773: Lock installer to single admin
+-feature#1987: Plugins should be able to be downloaded, installed, and upgraded from Plugin Management
+-feature#2166: LDAP configuration should only use 'user_domains_ldap'
+-feature#2333: The ability to export/import preset data profiles
+-feature#2429: Allow Device SNMP Options to be Templated
+-feature#2437: Create system-wide Proxy settings for plugins
+-feature#2439: Allow CDEF to be used as a filter for Graph/Graph Templates
+-feature#2474: Enable better version reporting for GitHub/Source/Package editions
+-feature#2550: Enable use of authenticator codes for Two-Factor Authentication
+-feature#2572: Support Sorting of Tree or Graph View by Data Source
+-feature#2607: Allow adding sites from command line
+-feature#2738: Set cache rebuild process indicator for the Cacti UI
+-feature#2767: Plugins should be temporarily disabled if a required plugin is also disabled
+-feature#2959: Add multi threading for push out hosts (cli)
+-feature#3048: Allow different log settings for remote pollers
+-feature#3139: Added option in CLI tool remove_graphs for deletion of single graph
+-feature#3187: Feature: rra path should be configurable
+-feature#3192: Add ability to change options in AUTOM8 networks
+-feature#3260: When a device is added, populate the created date/time
+-feature#3332: Remove files graph_items.php and graph_templates_items.php
+-feature#3333: Allow sequential network scans via AUTOM8
+-feature#3417: Add worst poller hosts to support page, log and email warning when poller time reached defined threshold
+-feature#3419: Automation should show network in discovered devices
+-feature#3430: Automation should report on devices added
+-feature#3513: Add hooks for plugins to show customize graph source and customize template url
+-feature#3518: Allow for 2 Levels of Poller sync
+-feature#3558: Allow copy_user cli script to set various additional fields
+-feature#3568; Allow exclusion of snmp fields / value(s) when adding graphs via CLI
+-feature#3584: Verify passwords against Pwned databases using API
+-feature#3585: CLI script to show database permissions that Cacti has
+-feature#3608: Graphs should be able to use |input_field_name| replacement variables
+-feature#3677: Relocate the delete button for collectors to the edit page
+-feature#3679: Allow searching logs by name, not just id
+-feature#3696: Allow use of ifDescr variable in Tree rules
+-feature#3724: Create Spikekill method to kill values over an absolute maximum
+-feature#3725: Create the ability for Spikekill to modify only certain DSes within an RRD
+-feature#3738: Ability to see MySQL permissions associated with current database user
+-feature#3740: Ability to disable a site
+-feature#3749: Clone a network automation
+-feature#3766: Bulk Export / Import Templates from Front-end
+-feature#3832: Exclude IP addresses in Automation Networks
+-feature#3833: Dry-run Automation Device Rule
+-feature#3845: Allow non-standard Remote Agent port to be used
+-feature#3904: Enhance automation to allow someone to view all recently discovered devices
+-feature#3943: Add hooks for plugins to show customize graph source and customize template url (List View)
+-feature#4157: Allow admin emails to utilise CLOG-style ID to name/link replacements
+-feature#4202: Editing State=Down device - mark online when editing device when responding by all required probes
+-feature#4296: Add hyperlink from graph edit page to graph-view
+-feature#4300: Allow GPrint/CDef/VDef to be visibile in graph template item lists
+-feature#4339: Change CLI progress output for rebuilding poller cache
+-feature#4778: Add devices sysName and sysLocation name as a Device description
+-feature#4811: Performance Issues on Template and Presets Pages on Large Installs and Drilldowns
+-feature#5020: Introduce script timeout for cmd.php
+-feature#5021: Allow form input validation to be reported to GUI
+-feature#5025: Add Least Squares Special Data Types to Cacti
+-feature#5027: Add Service Check Filter and Column and Device Thread Column
+-feature#5039: Add host_poller_id replacement variable
+-feature#5083: Make user log ask for confirmation on purge
+-feature#5120: Define cacti system paths as constants for better code checking
+-feature#5129: Add an option to skip table sync to remote pollers during upgrade process of Cacti
+-feature#5130: Add parameter "version" for Graph Templates
+-feature#5148: Allow theme-based include paths with master location
+-feature#5149: Allow CSS files to be loaded async #5149
+-feature#5163: DSSTATS - Add Additional Data Source Statics to Cacti
+-feature#5165: DSSTATS - Change data_source_stats_hourly_cache from Memory to INNODB
+-feature#5178: DSSTATS - Allow Retention of Daily, Weekly, Monthly and Yearly data for varying periods
+-feature#5212: Gradient Support drops Alpha translparency values from Areas and Does not Support Stack
+-feature#5215: DSSTATS - Cache the RRDtool Logic in a table to speed calculation of the staticis gathering
+-feature#5222: Allow Cacti Log to be Displayed in 'Raw Log' Format
+-feature#5225: When your Database server has TB of memory, memory calculation returns incorrect data in Cacti
+-feature#5231: When editing a Device show in state/uptime as a date in the header
+-feature#5267: Gradient Support does not work correctly on Aggregate Graphs
+-feature#5273: Add support for RRD --left-axis-format Options
+-feature#5278: Enhance Cacti's ping to use fping if it's installed to take advantage of sub-second timeouts
+-feature#5294: Allow Ignored Errors to be Logged such as 'No Route to host'
+-feature#5305: Remove files aggregate_items.php and color_templates_items.php and consolidate into their parents
+-feature#5316: Allow for searching in settings/menu
+-feature#5321: cli/push_out_hosts.php is deprecated, redirect to rebuild_poller.cache.php
+-feature#5328: Search through Data Query fields when searching for Graphs in Tree
+-feature#5368: Allow all key searching calls to be delayed by defined amount
+-feature#5378: When reload page in browser with graphs created scroll window always return to top
+-feature#5389: Forgot password function and email notification about new user or reset user password
+-feature#5406: Cacti connection handling should forcibly close connections to work around PDO uncertainty
+-feature#5407: Add last_updated column to the boost table to increase diagnostics in Cacti
+-feature#5416: Display device class before package import
+-feature#5463: When building Automation Rules, show the 'effective sql' on the page for users who know SQL
+-feature#5578: Provide new templates for Aruba switch, Aruba wifi controller and HPE iLO to be available during install
+-feature#5588: When upgrading Cacti deprecated/removed libraries and files still exist
+-feature#5596: Add template Aruba OSCX switch 6x00
+-feature#5601: Order Graph Item Inputs Naturally (MariaDB 10.7++, no MySQL support)
+-feature#5640: Boost log file visibility and rotation not as expected
+-feature#5681: Add poller information to graph-variables
+-feature#5717: Add Aruba Clearpass template
+-feature#5804: Remove the Classic Theme in Cacti
+-feature#5833: Add button for remove all data and configuration/settings
+-feature#5837: Remote poller installer should test version of cacti and new poller
+-feature#5838: Reduce the number of default log from automation
+-feature#5849: Separate Logging related settings to a new settings tab
+-feature#5855: Replace Plugin Images with FontAwesome Glyphs
+-feature#5857: Create a Reporting Queue for Cacti and Plugins to schedule reports
+-feature#5858: Create a Reporting log table to hold various data from Cacti Reports for base Cacti and from Plugins
+-feature#5860: When Cacti is running on MariaDB move the Data Source statistics partitions to the ARIA table format
+-feature#5861: In Cacti Utilities, be able to view the MariaDB/MySQL processeslist and active background tasks
+-feature#5862: Change logging message around remote agent timeout
+-feature#5866: Add 'database' to the permission structure in db_get_permissions() function
+-feature#5871: Make it possible for splice_rrd.php to run from outside of Cacti
+-feature#5889: Make it so that Cacti does not share sessions between browser tabs
+-feature#5892: Enable Authentication Cookies by Default in New Installs
+-feature#5907: Add Filter for Data Input Method on Data Templates
+-feature#5908: Add Searching of Notes and External ID when Searching for a Device
+-feature#5909: Add 'legend shorthand' for Graph Template Items
+-feature#5920: Remove the use of tables for alignment on graphs page and move to flex alignment
+-feature#5922: Add HPE Nimble/Alletra template
+-feature#5923: If RRDtool crashes due to a segmentation fault, report that and retry a few times
+-feature#5931: Make it easier to connect content in the table data_input_data to the host and data source
+-feature#5935: Add additional detail to the Admin Email to trace the server's impacted by the errors
+-feature#5941: Implement Drag and Drop on Graph Templates Edit Page
+-feature#5942: Improve Speed of Graph Template Editing Through Bulk Updates
+-feature#5948: Allow Graph Template Classes to be changed enmass
+-feature#5952: Create a new form dropdown type called drop_icon
+-feature#5954: Add Check boxes to Graph Templates Change Page
+-feature#5955: When Changing a Profile Update Other Data
+-feature#5958: When archiving a plugin, give the user the ability to add a note
+-feature#5959: Debounce the Poller Output Not Empty Warning
+-feature#5965: Merge packaging plugin with Cacti and add archiving and restore capabilities
+-feature#5966: Add snmp retries at the device level
+-feature#5970: Import/Export Automation should take THold into account
+-feature#5971: Add a method to mark missing Data in all graphs globally
+-feature#5993: Allow Automation Rules to Search through Site Information
+-feature#5997: Add filter for devices in maintenance plan, add icon to device list
+-feature#6001: Extend SYSTEM STATS log entry
+-feature#6033: Allow Admins to see when a template was last modified
+-feature#6034: Allow Users to Drill Up from CDEF's and VDEF's to Graphs and Graph Templates
+-feature#6044: Enable the capabilities to view historical Classical Cacti Report from the GUI
+-feature#6063: Change installer page Input Validation Whitelist Protection to Recommendations
+-feature#6066: Enable Drag and Drop for External Links
+-feature#6191: Adding Natural sorting options for Hostname
+-feature#6228: Add admin's email to installer and enable "Notify primary admin of issues" 
+-feature#6454: Create a logging recursion ticket that helps against recusion loops in cacti_log
+-feature#6495: Add bulk change data source profile functionality with automatic RRD rebuild
+-feature#6539: Allow Standard Cacti Log Files to be Rotated on Demand from the Cacti UI
+-feature: Allow messages to be popup notifications
+-feature: Upgrade billboard.js to version 3.14.1
+-feature: Upgrade jQueryUI to version 1.14.1
+-feature: Upgrade d3.js to version 7.8.2
+-feature: Upgrade ua-parser.js to version 1.0.35
+-feature: Upgrade jquery.tablednd.js to version 1.0.5
+-feature: Upgrade FontAwesome to version 6.7.2
+-feature: Add parsedown to vendor library for plugin CHANGELOG and README viewing support
+-feature: Add year display to get_daysfromtime function
+-feature: Add class and version columns to Graph Template to support Streams feature
+-feature: Allow Reports to be sent to a Notification List if thold is installed
+-feature: Remove legacy Lotus Notes Attachment Types from Reports
+-feature: Fortigate firewall template extension with SDWAN tests
+-feature: Continue to support MD5() for the password verifications but also support SHA256
+
 1.2.31
+-security#GHSA-6RVG-2VM8-5WRF: CVE-2026-22802 Authentication Bypass leads to information disclosure
+-security#GHSA-9wvp-cfx6-hj7p: CVE-2026-24482 1st argument to preg_replace is not sanitized and given from user_inputs
+-security#GHSA-j3p9-q28q-8j33: CVE-2026-24483 Unsafe serialization usage in the maint plugin on user supplied POST data
 -security#GHSA-23g4-vf2j-94w4: CVE-2026-39894 RRDtool metric shift via LC_NUMERIC locale comma decimal formatting
--security#GHSA-273r-qr93-wgcp: CVE-2026-40082 Session Fixation via missing session_regenerate_id() after login
--security#GHSA-274c-97hj-pv2v: CVE-2026-40941 Package Import Signature Validation Bypass allows self-signed packages
--security#GHSA-2j98-xfjq-gw39: CVE-2026-39897 Reflected XSS in html_auth_footer error message output
--security#GHSA-34rf-frc3-v48r: CVE-2026-39900 Reflected XSS via tab parameter in auth_profile.php JavaScript context
--security#GHSA-37jj-rx8x-4wf2: CVE-2026-46531 SQL Injection in automation_tree_rules.php
--security#GHSA-3vj5-jqr9-q8hg: CVE-2026-44481 Pre-auth Open Redirect via link.php Referer header
--security#GHSA-6233-v5hc-6gvf: CVE-2026-39952 Stored XSS in Report Tree expansion titles
--security#GHSA-69gg-mjfm-jjpc: CVE-2026-39893 Pre-authentication SQL injection via rfilter RLIKE clause in graph_view.php
--security#GHSA-6RVG-2vm8-5wrf: CVE-2026-22802 Authentication Bypass leads to information disclosure
--security#GHSA-6gr7-53g8-vchq: CVE-2026-40080 Open Redirect via HTTP_REFERER substring check in auth_login_redirect
--security#GHSA-84q3-92xc-c3pf: CVE-2026-40078 Backend ORDER BY SQL Injection
--security#GHSA-8522-5p3m-754c: CVE-2026-39949 Authenticated Remote Code Execution via Host Variable Injection
--security#GHSA-8p2f-6jvx-j75j: CVE-2026-40081 Reports IDOR allows any authenticated user to modify other users' reports (CWE-639)
--security#GHSA-9jqv-4cpm-vm2c: CVE-2026-39948 SQL Injection via rfilter parameter in RLIKE clauses
--security#GHSA-c4qp-j9r9-fq24: CVE-2026-39902 Authenticated RCE on Data Input
--security#GHSA-fwh3-8c8r-378r: CVE-2026-39898 Reflected XSS via rfilter parameter in aggregate_graphs.php input value
--security#GHSA-g37j-39f4-6r4j: CVE-2026-41884 Arbitrary File Read via Reports format_file path traversal
--security#GHSA-gp82-qhrg-crv7: CVE-2026-39955 Pre-Authentication SQL Injection via unanchored FILTER_VALIDATE_REGEXP in graph_view.php
+-security#GHSA-wpjq-m269-mghj: CVE-2026-39895 Second-order RCE via unescaped log path in exec_background shell redirection
 -security#GHSA-hr82-h9vr-587w: CVE-2026-39896 TOCTOU race in auth_process_lockout allows brute-force lockout bypass
--security#GHSA-j696-m433-87qq: CVE-2026-39950 Arbitrary PHP file write via Plugin Archive extraction leading to RCE
--security#GHSA-j9jv-6xjq-9hhj: CVE-2026-40083 SQL Injection in managers.php via uncast array values in IN clauses
--security#GHSA-m7v2-f3xw-3qh7: User Enumeration via Error Messages
--security#GHSA-mjvw-mhj5-9jcj: CVE-2026-40084 Arbitrary File Read via path traversal in Report format_file parameter
--security#GHSA-pf37-v86f-5xwp: CVE-2026-39951 Stored SQL Injection via graph_name_regexp in Reports feature
+-security#GHSA-2j98-xfjq-gw39: CVE-2026-39897 Reflected XSS in html_auth_footer error message output
+-security#GHSA-fwh3-8c8r-378r: CVE-2026-39898 Reflected XSS via rfilter parameter in aggregate_graphs.php input value
 -security#GHSA-pr9x-34w8-4mf7: CVE-2026-39899 Path traversal via filename parameter in package_import.php
+-security#GHSA-34rf-frc3-v48r: CVE-2026-39900 Reflected XSS via tab parameter in auth_profile.php JavaScript context
+-security#GHSA-w47c-53f9-w47g: CVE-2026-39947 RRDtool IPC pipe poisoning via is_numeric newline bypass in rrdtool_function_update
+-security#GHSA-9jqv-4cpm-vm2c: CVE-2026-39948 SQL Injection via rfilter parameter in RLIKE clauses
+-security#GHSA-xq98-376r-hv9j: CVE-2026-40079 Command Injection via escape_command() no-op in RRDtool execution
+-security#GHSA-69gg-mjfm-jjpc: CVE-2026-39893 Pre-authentication SQL injection via rfilter RLIKE clause in graph_view.php
+-security#GHSA-c4qp-j9r9-fq24: CVE-2026-39902 Authenticated RCE on Data Input
 -security#GHSA-rm7p-qcqm-x5m6: CVE-2026-39938 Unauthenticated LFI via graph_theme and rrdtool IPC serialization hardening
 -security#GHSA-vp35-4h28-r883: CVE-2026-39939 Path traversal in Package Import file write allows arbitrary file creation in webroot
--security#GHSA-w47c-53f9-w47g: CVE-2026-39947 RRDtool IPC pipe poisoning via is_numeric newline bypass in rrdtool_function_update
--security#GHSA-wpjq-m269-mghj: CVE-2026-39895 Second-order RCE via unescaped log path in exec_background shell redirection
--security#GHSA-xq98-376r-hv9j: CVE-2026-40079 Command Injection via escape_command() no-op in RRDtool execution
--security: CVE-2026-40194, CVE-2026-32935 in phpseclib - This is breaking change for RRDProxy
+-security#GHSA-8522-5p3m-754c: CVE-2026-39949 Authenticated Remote Code Execution via Host Variable Injection
+-security#GHSA-j696-m433-87qq: CVE-2026-39950 Arbitrary PHP file write via Plugin Archive extraction leading to RCE
+-security#GHSA-pf37-v86f-5xwp: CVE-2026-39951 Stored SQL Injection via graph_name_regexp in Reports feature
+-security#GHSA-6233-v5hc-6gvf: CVE-2026-39952 Stored XSS in Report Tree expansion titles
+-security#GHSA-xrh3-6pfg-ff35: CVE-2026-39953 Unauthenticated Stored SQL Injection via graph_name_regexp in reports.php
+-security#GHSA-gp82-qhrg-crv7: CVE-2026-39955 Pre-Authentication SQL Injection via unanchored FILTER_VALIDATE_REGEXP in graph_view.php
+-security#GHSA-84q3-92xc-c3pf: CVE-2026-40078 Backend ORDER BY SQL Injection
+-security#GHSA-6gr7-53g8-vchq: CVE-2026-40080 Open Redirect via HTTP_REFERER substring check in auth_login_redirect
+-security#GHSA-8p2f-6jvx-j75j: CVE-2026-40081 Reports IDOR allows any authenticated user to modify other users' reports (CWE-639)
+-security#GHSA-273r-qr93-wgcp: CVE-2026-40082 Session Fixation via missing session_regenerate_id() after login
+-security#GHSA-j9jv-6xjq-9hhj: CVE-2026-40083 SQL Injection in managers.php via uncast array values in IN clauses
+-security#GHSA-mjvw-mhj5-9jcj: CVE-2026-40084 Arbitrary File Read via path traversal in Report format_file parameter
+-security#GHSA-274c-97hj-pv2v: CVE-2026-40941 Package Import Signature Validation Bypass allows self-signed packages
+-security#GHSA-g37j-39f4-6r4j: CVE-2026-41884 Arbitrary File Read via Reports format_file path traversal
 -security: CVE-2026-1513 billboard.js before 3.18.0 Improper Input Sanitization Allows Remote JavaScript Execution
+-security: CVE-2026-40194, CVE-2026-32935 in phpseclib - This is breaking change for RRDProxy
+-security: CVE-2026-XXXXX - SQL Injection in automation_tree_rules.php
 -issue#6168: When purging RRD files, paths are not correctly handled
 -issue#6202: When using automation, devices may not be added as expected
 -issue#6204: Attempting to match a field in automation may cause unexpected errors
 -issue#6210: Ensure column names are escaped to prevent reserved word issues
 -issue#6240: Improve sort order for incorrect RRA's
 -issue#6249: Unable to send Email to users without a domain name
--issue#6251: When viewing a graph, do not produce unnecessary errors if graph has been removed
--issue#6253: When i18n formatting numbers, assume null means 0 by xmacan
--issue#6257: When data sources are removed, ensure only RRD files are removed by xmacan
--issue#6262: When the database connection drops during query, retry to ensure success
--issue#6270: Incorrect escaping may prevent drop downs working as intended
--issue#6271: When validation errors occur, provide more information to help diagnosis
--issue#6283: When calculating total pages, ensure math errors do not occur
--issue#6292: When validating null request variables, fatal errors may occur
--issue#6294: Automation may produce unexpected warnings when detecting the OS
--issue#6296: Process timeouts may not end processes as expected
--issue#6297: Improve support for Secure SMTP
--issue#6299: Improve email address handling to support UTF8
--issue#6313: When editing multiple devices, unexpected errors may be recorded
--issue#6314: When editing an Aggregation Graph, total count may not reflect number of items correctly
--issue#6315: When duplicating a Data Input Method, unexpected errors may occur
--issue#6326: Improve SNMP v3 support for Cisco devices
--issue#6327: Implement Autocomplete standards for Login and Change Password
--issue#6329: When using LDAP, checking a user's groups may cause unexpected errors
--issue#6331: When upgrading from pre-1.0.5, unexpected errors may occur by YATV
--issue#6334: When creating Aggregate graphs, unable to hide HRULE and COMMENT based items
--issue#6335: Email addresses with leading or trailing spaces can cause issues
--issue#6441: Spikekill uses the wrong option for retention periods by 3432
--issue#6444: When a Data Input's Title is applied, unexpected errors and values may be seen
--issue#6490: When using Clear All on Selective Debug, first item is reselected
--issue#6507: Importing packages may not work as expected by xmacan
--issue#6508: When exporting graphs, data issues may lead to unexpected errors by xmacan
--issue#6516: When modifying Graph Automation Rules, unexpected errors may be logged
--issue#6518: Improve security of CSRF Secret by SMark-Black
--issue#6519: When using Real Time graphing, unexpected errors may appear if graph is removed
--issue#6546: Restore some missing SNMP Script Server configurations
--issue#6551: Improve support for FreeBSD when Auditing Databases by xmacan
--issue#6573: Create new device_change_javascript hook for THOLD plugin by xmacan
--issue#6598: Improve PHP 8 support by TheWitness
--issue#6600: When replicating plugins, unexpected errors may appear due to missing tables
--issue#6605: Prevent Row Data Loss When Rebuilding RRD Files
--issue#6606: When using SpikeKill, actions would not always lead to expected results
--issue#6706: Some hosts may show as down incorrectly by xmacan
--issue#6945: Improve PHP 8.5 support
--issue#7121: When using data input methods, unexpected log entries may appear
--issue#7133: When attempting to push out items, offline data sources can have unexpected results
--issue#7135: Fix issue with locally scoped OID/Script path not being correctly cleared
--issue#7199: CSV Color Import fails
--issue#7202: Removed plugins may leave orphan entries in plugin tables
--feature#6523: When disabling users, ensure that their authentication cookies and sessions cleared
--feature#6524: When changing your password, log off from all sessions
--feature#6534: Improve Cacti Session ID security
--feature#6607: Implement session security on Password change
--feature#6681: Add Dell iDRAC template by xmacan
--feature: Update DOMPurify to 3.4.7
+-issue#6251: Cacti can issue a warning in a case where a user attempts to view a graph that no longer exists
+-issue#6253: Unification of i18n behaviour when the input is null
+-issue#6257: Fix archive rrd with structural path, remove only rrd file check
+-issue#6262: If the database service restarts during polling or other activities errors occur
+-issue#6270: Select list using special characters for the current value can not be displayed in thold
+-issue#6271: Improve validation logging to give administrators a clue where the error came from
+-issue#6283: Divide by Zero if the $rows variable is not set
+-issue#6292: Fatal validation errors occur if a request variable default value is null
+-issue#6294: Undefined variable $params in lib/api_automation.php
+-issue#6296: Issue with posix_kill function using Windows as your Cacti server
+-issue#6297: Enhance SMTP Security Settings to Higher Order TLS
+-issue#6299: Support SMTPUTF8 for modern Email Servers
+-issue#6313: Errors when editing multiple devices with unset value
+-issue#6314: Newly Added Items in Aggregation Chart Don’t Reflect in Item Count
+-issue#6315: Undefined function error duplicating a data input method
+-issue#6326: Issues with Cisco Devices and Higher Levels of Privacy
+-issue#6327: Update Browser Login and Change Password Autocomplete to new Browser Standard
+-issue#6329: PHP Error on LDAP access
+-issue#6331: Upgrading from old versions of Cacti prior to 1_0_5 generates errors
+-issue#6334: Unable to hide HRULE and COMMENT items for Aggregate of Interface Traffic graph (which includes 95th percentile)
+-issue#6335: Fix incorrect parsing of email address containing whitespace
+-issue#6441: Spikekill Purge Using the wrong variable
+-issue#6444: Applying Title Cache Changes for Data Input Methods using |data_xxxx| not working
+-issue#6490: Selective Debug Setting in Cacti 'Clear All' button results in selecting the first item
+-issue#6507: Fix incorrect cli parameter when loading template information
+-issue#6508: PHP Error when exporting data 
+-issue#6516: SQL Errors in Automation Graph Rules processing
+-issue#6518: Ensure that the csrf-secret file is written in a less permissive way
+-issue#6519: Realtime generates errors in the Cacti Log after a Graph has been removed
+-issue#6546: Add missing xml and script files for NetSNMP LMSensor
+-issue#6551: Fix paths in audit_database script (FreeBSD)
+-issue#6574: Add hook device_change_javascript, necessarily for thold
+-issue: Correct some PHPStan issues found in audit of Aggregate that can lead to warnings
+-issue: Using the rrd_splice.php cli can result in the loss of data
+-issue: Defect in SpikeKill algorithm was causing a loss of data for Gap Fill and Float methods
+-issue: Make local modifications to the phpdiff vendor package for backwards compatibility
+-feature#6523: When disabling a users, ensure that their stored authentication cookies are remove and any sessions cleared
+-feature#6524: When changing your password, logout from all sessions
+-feature: Close user sessions after a password change is forced
 -feature: Update PHPMailer to 6.10 to support SMTPUTF8
 -feature: Update phpseclib for the Service Check plugin
--feature: Update jstree to 3.3.17 for CSP Level 3 compliance
+-feature: Update DOMPurify to 3.3.0
 
 1.2.30
--issue#6089: Unable to add new users
--issue#6090: When using Automation Rules, specifying graph criteria may cause issues
+-issue#6089: Cannot Add New User due to incorrect array structure
+-issue#6090: Undefined function warnings in Automation
 -issue#6099: When transferring a system from a backup if the poller has not run recently rrdtool issues are found
 -issue#6172: Quoting issues leading to translation issue in form messaging in Chinese language
 -issue#6173: Deprecation warning when using boost for the first time
--issue#6183: When refreshing forms, items may be checked incorrectly by xmacan
+-issue#6183: Checkbox is displayed always on in some cases
 
 1.2.29
--security#GHSA-c5j8-jxj3-hh36: Authenticated RCE via multi-line SNMP responses
--security#GHSA-f9c7-7rc3-574c: SQL Injection vulnerability when using tree rules through Automation API
--security#GHSA-fh3x-69rr-qqpp: SQL Injection vulnerability when request automation devices
--security#GHSA-fxrq-fr7h-9rqq: Arbitrary File Creation leading to RCE
 -security#GHSA-pv2c-97pp-vxwg: Local File Inclusion (LFI) Vulnerability via Poller Standard Error Log Path
+-security#GHSA-f9c7-7rc3-574c: SQL Injection vulnerability when using tree rules through Automation API
 -security#GHSA-vj9g-P7F2-4wqj: SQL Injection vulnerability when view host template
--issue#5843: Temporary table names may incorrectly think they have a schema
--issue#5847: When using Preset Time to view graphs, it is using a fixed point rather than relative time
--issue#5848: Fix issue where RRA files are not automatically removed
--issue#5856: Fix invalid help link for Automation Networks
--issue#5867: Unable to disable a tree within the GUI
--issue#5868: When removing graphs, RRA files may be left behind
--issue#5869: Improve compatibility with ping under FreeBSD
--issue#5870: Improve compatibility wtih Slice RRD tool under PHP 8.x
--issue#5874: Allow IPv6 formats to use colons without port
--issue#5884: Update Fortigate, Aruba OSCX and Clearpass templates
--issue#5927: When a plugin is disabled, unable to use GUI to enable it again
--issue#5932: When upgrading, ensure that replication only runs as necessary
--issue#5961: Improve caching and syncing issues with replication
--issue#5963: Improve caching techniques for database calls
--issue#5986: Improve compatibility for Error constants under PHP 8.4
--issue#5987: When running the upgrade database script, cursor is left in the middle of the row
--issue#6065: Guest page does not automatically refresh
--issue#6078: When installing, conversion of tables may produce collation errors
+-security#GHSA-fh3x-69rr-qqpp: SQL Injection vulnerability when request automation devices
+-security#GHSA-c5j8-jxj3-hh36: Authenticated RCE via multi-line SNMP responses
+-security#GHSA-fxrq-fr7h-9rqq: Arbitrary File Creation leading to RCE
+-issue#5843: Issue with temporary tables with use of microtime
+-issue#5847: Presets Time in Cacti 1.2.28 Not Automatically Updating...
+-issue#5848: RRDfile Auto Clean not working
+-issue#5856: Help HTML file is incorrect for Automation Networks
+-issue#5867: Disabling a Tree does not function as expected
+-issue#5868: Error when remove Orphaned Graphs from GUI
+-issue#5870: CLI utility splice_rrd.php generates an error in PHP8+
+-issue#5874: IPV6 address colon format causes the snmp query to not work
+-issue#5884: Fix Fortigate and Aruba OSCX switch template, improve Clearpass template
+-issue#5927: Unable to re-enable a plugin using plugin_manage.php
+-issue#5932: When upgrading Cacti, the replicate_out() process runs repeatedly
+-issue#5961: Issues with Replication of Tables and Misleading Full Sync Time
+-issue#5963: Cacti caching for db_table_exists() and db_column_exists() is not connection aware and replication does not replicate empty table structures
+-issue#5986: PHP ERRORS with php8.4 while including global_arrays.php
+-issue#5987: Please add a new line to upgrade_database script
+-issue#6065: Preview page no longer refreshes
+-issue#6078: Convert tables errors when using default mariadb collation settings
 -feature#5921: Add HPE Nimble/Alletra template
--feature#5933: When installing, only convert core cacti tables
+-feature#5933: Only attempt to change the table type and character encoding for built-in Cacti tables
 
 1.2.28
 -security#GHSA-49f2-hwx9-qffr: XSS vulnerability when creating external links with the consolenewsection parameter
@@ -139,13 +341,13 @@ Cacti CHANGELOG
 -issue#5759: When installing, remote poller may attempt to sync with other pollers
 -issue#5768: When a Data Query has a space, indexes may not be properly escaped
 -issue#5771: Boost does not always order data source records properly
--issue#5772: Add IP address to the login audit for successful logins
--issue#5773: Undefined variable error may sometimes occur when dealing with RRD output
+-issue#5772: Add IP address to the login audit for successful logins by xmacan
+-issue#5773: Undefined variable error may sometimes occur when dealing with RRD output by MSS970
 -issue#5777: When export to CSV, only the first line of notes is included
 -issue#5780: When rendering forms, missing default value can cause errors
 -issue#5782: Allow hosted content to be executable for the links page
 -issue#5783: When closing database connections, some may linger incorrectly
--issue#5785: When changing passwords, an infinite loop may occur
+-issue#5785: When changing passwords, an infinite loop may occur by ddb4github
 -issue#5790: When using Cacti Daemon, a "Cron out of sync" message may be reported
 -issue#5791: Add ability to filter/sort users by group or last login time
 -issue#5792: When using List View, unable to add Graphs to a Report
@@ -156,7 +358,7 @@ Cacti CHANGELOG
 -issue#5814: When using structured RRD folders, permission issues may be flagged incorrectly
 -issue#5823: When unable to locate a valid theme, new default will be Modern
 -issue#5824: Properly cache the data source information for dsstats processing
--issue#5840: When reindexing, verify all fields may not work as intended
+-issue#5840: Reindex Method 'Verify all Fields' does not work for OID/INDEX parse method
 -feature#5784: Add ability to log database connections/disconnections
 -feature#5796: Add Ping Method where connection refused assumes host is up
 -feature#5819: When displaying graphs, default end time does not show full 24 hour period
@@ -212,42 +414,33 @@ Cacti CHANGELOG
 -feature#5730: Add fliter/sort of Device Templates by Graph Templates
 
 1.2.26
--security#GHSA-xwqc-7jc4-xm73: XSS vulnerability when importing a template file
--security#GHSA-pfh9-gwm6-86vp: RCE vulnerability when managing links
--security#GHSA-vr3c-38wh-g855: SQL Injection vulnerability when managing poller devices
--security#GHSA-wc73-r2vw-59pr: XSS vulnerability when adding new devices
--security#GHSA-q7g7-gcf6-wh4x: XSS vulnerability when viewing data sources in debug mode
--security#GHSA-w85f-7c4w-7594: SQL Injection vulnerability when managing SNMP Notification Receivers
--issue#5464: When viewing data sources, an undefined variable error may be seen
--issue#5478: Improvements for Poller Last Run Date
+-issue#5464: PHP warning when view Data Source Info mode with new Data Source
 -issue#5481: Attempting to edit a Data Query that does not exist throws warnings and not an GUI error
--issue#5483: Improve PHP 8.1 support when adding devices
--issue#5485: Viewing Data Query Cache can cause errors to be logged
--issue#5489: Preserve option is not properly honoured when removing devices at command line
--issue#5490: Infinite recursion is possible during a database failure
--issue#5492: Monitoring Host CPU's does not always work on Windows endpoints
+-issue#5483: cacti 1.2.25 ubuntu server 22.04.3 php8.1 add device error
+-issue#5485: Selecting a host device in System Utilities - View Data Query Cache raises error in cacti log
+-issue#5489: remove_graphs.php does not handle "--preserve" option
+-issue#5490: Database failure causes infinite recursion in cacti_log() followed by machine lockup
+-issue#5492: Cacti 1.2.25 ss_host_cpu.php CPU graphs not updating anymore on Windows servers
 -issue#5493: Multi select drop down list box not rendered correctly in Chrome and Edge
--issue#5494: Selective Plugin Debugging may not always work as intended
--issue#5495: During upgrades, Plugins may be falsely reported as incompatible
--issue#5496: Plugin management at command line does not work with multiple plugins
--issue#5502: Improve PHP 8.1 support for incrementing only numbers
--issue#5503: Allow the renaming of guest and template accounts
+-issue#5494: typo error in name used in inserts array for selective_plugin_debug
+-issue#5495: Upon upgrade, cacti falsely assumes that a plugin is not compatible, when it could simply not be present
+-issue#5496: Plugin Management CLI does not work when multiple plugins are specified
+-issue#5502: Errors related to php 8.3 and page generation including a checkbox
+-issue#5503: Note, we could not process all your actions. Details are below
 -issue#5514: DS Stats issues warnings when the RRDfile has not been initialized
--issue#5527: When upgrading, missing data source profile can cause errors to be logged
--issue#5534: When deleting a single Data Source, purge historical debug data
--issue#5542: Improvements to form element warnings
--issue#5554: Some interface aliases do not appear correctly
+-issue#5527: Upgrade from 0.8.8 to 1.2.25 (latest) fails on db upgrade due to missing data source profile id
+-issue#5534: When deleting a single Data Source the table data_debug is not purged
+-issue#5542: When a form element does not include a 'value' column, provide a more helpful warning message
+-issue#5554: Interface description with equal sign (=) in ifAlias does not show Alias
 -issue#5555: Aggregate graph does not show other percentiles
--issue#5561: Settings table updates for large values reverted by database repair
--issue#5564: When obtaining graph records, error messages may be recorded
--issue#5565: Unable to change a device's community at command line
--issue#5572: Increase timeout for RRDChecker
--issue#5573: When viewing a graph, option to edit template may lead to incorrect URL
--issue#5581: When upgrading, failures may occur due to missing color table keys
--issue#5583: On installation, allow a more appropriate template to be used as the default
--issue#5585: When data input parameters are allowed to be null, allow null
--issue#5586: CSV Exports may not always output data correctly
--issue#5589: When debugging a graph, long CDEF's can cause undesirable scrolling
+-issue#5561: Settings table custom size reverted by database repair
+-issue#5572: RRD Checker timeouts to low
+-issue#5573: Incorrect URL for editing graph template
+-issue#5581: Due to previously never completed upgrade, future upgrades fail due to missing color table keys
+-issue#5583: On install ensure Default Device is either Net-SNMP or Cisco Router or allow user to define during install
+-issue#5585: Refix Issue #4649 using more appropriate method
+-issue#5586: CSV export displays data shifted by rrd step interval
+-issue#5589: When a graph has a real long cdef in graph debug mode, it forces an undesirable scroll
 -issue#5590: Secondary LDAP server not evaluated when the first one has failed
 -issue#5602: When adding a device, using the bulk walk option can make version information appear
 -issue#5609: When parsing a Data Query resource, an error can be reported if no direction is specified

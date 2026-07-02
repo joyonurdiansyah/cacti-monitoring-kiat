@@ -1,33 +1,11 @@
 <?php
-/*
- +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2026 The Cacti Group                                 |
- |                                                                         |
- | This program is free software; you can redistribute it and/or           |
- | modify it under the terms of the GNU General Public License             |
- | as published by the Free Software Foundation; either version 2          |
- | of the License, or (at your option) any later version.                  |
- +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDtool-based Graphing Solution                     |
- +-------------------------------------------------------------------------+
-*/
 
-/*
- * Tests for colourBrightness() in lib/rrd.php.
+/**
+ * Tests for colourBrightness() in lib/rrd.php
  *
- * Validates the fix for integer percentages, negative percent math,
+ * Validates fix for integer percentages, negative percent math,
  * and RGB lower-bounds clamping.
- *
- * lib/rrd.php calls read_config_option() at the top level during load.
- * A minimal stub is defined here so the file can be included without a
- * database connection or full Cacti bootstrap.
  */
-
-if (!function_exists('read_config_option')) {
-	function read_config_option($option, $force = false) {
-		return false;
-	}
-}
 
 require_once dirname(__DIR__, 2) . '/lib/rrd.php';
 
@@ -71,8 +49,8 @@ test('colourBrightness darker black stays black', function () {
 
 test('colourBrightness does not produce negative RGB values', function () {
 	$result = colourBrightness('010101', -0.99);
-	// dechex() on a negative int produces a two's-complement string, so
-	// validate the output is a well-formed 6-char hex before extracting channels.
+	// dechex() on a negative int yields a two's-complement string, so
+	// assert well-formed 6-char hex before extracting individual channels.
 	expect($result)->toMatch('/^[0-9a-f]{6}$/i');
 	$r = hexdec(substr($result, 0, 2));
 	$g = hexdec(substr($result, 2, 2));
@@ -92,7 +70,7 @@ test('colourBrightness does not exceed 255 for any channel', function () {
 	expect($b)->toBeLessThanOrEqual(255);
 });
 
-// Boundary: percent = 0 routes to the darker branch with zero darkening;
+// Boundary: percent=0 routes to the darker branch with zero darkening;
 // the result must be the original colour unchanged.
 test('colourBrightness with percent 0 returns original colour', function () {
 	expect(colourBrightness('4080c0', 0))->toBe('4080c0');

@@ -1,80 +1,74 @@
-# =============================================================================
-# Cacti Monitoring — Docker Compose
-# =============================================================================
-# Environment: copy .env.example to .env and edit credentials before running.
+# Cacti Development Environment
 #
 # Usage:
-#   docker compose up -d             # Start all services
-#   docker compose down              # Stop all services
-#   docker compose logs -f           # Follow logs
-#   docker compose exec cacti-web bash   # Shell into web container
-# =============================================================================
+#   cp .env.example .env
+#   docker compose up -d
+#
+# Access Cacti at http://localhost:8080/cacti
+# Schema auto-imported on first DB start; complete the web installer to finish setup.
 
 services:
-
-  # ---------------------------------------------------------------------------
-  # Cacti Database — MySQL 8.0
-  # Stored on host port 3310 to avoid conflict with Laragon MySQL (port 3306)
-  # ---------------------------------------------------------------------------
-  cacti-db:
-    image: mysql:8.0
-    container_name: cacti-mysql
-    restart: unless-stopped
-    networks:
-      - cacti-network
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: cacti_web
     ports:
-      - "${CACTI_DB_PORT:-3310}:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?err}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-cacti}
-      MYSQL_USER: ${MYSQL_USER:-cactiuser}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?err}
-      TZ: ${TZ:-Asia/Jakarta}
+      - "${WEB_PORT:-8080}:80"
     volumes:
-      - cacti-mysql-data:/var/lib/mysql
+      # Source code (ro); named volumes overlay cache/rra/log to keep them out of the tree.
+      - .:/var/www/html/cacti
+      - cacti_cache:/var/www/html/cacti/cache
+      - cacti_rra:/var/www/html/cacti/rra
+      - cacti_logs:/var/www/html/cacti/log
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-cacti}
+      DB_PASS: ${DB_PASSWORD:-cacti}
+      DB_NAME: ${DB_NAME:-cacti}
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-512M}
+      TIMEZONE: ${TIMEZONE:-UTC}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mariadb:11.8
+    container_name: cacti_db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB_NAME:-cacti}
+      MYSQL_USER: ${DB_USER:-cacti}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-cacti}
+      TZ: ${TIMEZONE:-UTC}
+    ports:
+      - "127.0.0.1:${DB_PORT:-3306}:3306"
+    volumes:
+      - cacti_db:/var/lib/mysql
+      - ./cacti.sql:/docker-entrypoint-initdb.d/cacti.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-connections=${DB_MAX_CONNECTIONS:-200}
+      - --max-heap-table-size=128M
+      - --tmp-table-size=128M
+      - --join-buffer-size=128M
+      - --innodb-buffer-pool-size=${DB_BUFFER_POOL_SIZE:-1G}
+      - --innodb-flush-log-at-timeout=3
+      - --innodb-read-io-threads=32
+      - --innodb-write-io-threads=16
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
-
-  # ---------------------------------------------------------------------------
-  # Cacti Web + Poller — Apache, PHP 8.1, RRDtool, SNMP, Cron
-  # Stored on host port 8090 to avoid conflict with OCS Inventory (port 8080)
-  # ---------------------------------------------------------------------------
-  cacti-web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: cacti-web
     restart: unless-stopped
-    networks:
-      - cacti-network
-    ports:
-      - "${CACTI_WEB_PORT:-8090}:80"
-    environment:
-      CACTI_DB_HOST: cacti-db
-      CACTI_DB_PORT: "3306"
-      CACTI_DB_NAME: ${MYSQL_DATABASE:-cacti}
-      CACTI_DB_USER: ${MYSQL_USER:-cactiuser}
-      CACTI_DB_PASS: ${MYSQL_PASSWORD:?err}
-      CACTI_URL_PATH: ${CACTI_URL_PATH:-/}
-      TZ: ${TZ:-Asia/Jakarta}
-    volumes:
-      - cacti-rra-data:/var/www/html/rra
-      - ./log:/var/www/html/log
-    depends_on:
-      cacti-db:
-        condition: service_healthy
-
-networks:
-  cacti-network:
-    name: cacti-network
-    driver: bridge
 
 volumes:
-  cacti-mysql-data:
-    name: cacti-mysql-data
-  cacti-rra-data:
-    name: cacti-rra-data
+  cacti_db:
+  cacti_cache:
+  cacti_rra:
+  cacti_logs:

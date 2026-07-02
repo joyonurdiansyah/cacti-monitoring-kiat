@@ -2,118 +2,54 @@
 /*
  +-------------------------------------------------------------------------+
  | Copyright (C) 2004-2026 The Cacti Group                                 |
+ |                                                                         |
+ | This program is free software; you can redistribute it and/or           |
+ | modify it under the terms of the GNU General Public License             |
+ | as published by the Free Software Foundation; either version 2          |
+ | of the License, or (at your option) any later version.                  |
  +-------------------------------------------------------------------------+
  | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
 */
 
-/*
- * Behavior tests for cacti_validate_theme().
- *
- * Root-cause mitigation for GHSA-rm7p / GHSA-cx5r (LFI via graph_theme).
- * The helper must allowlist-validate the theme name against the actual
- * contents of include/themes/ and return a safe default for anything else.
- *
- * Tests use source-scan + isolated reimplementation to avoid the full
- * Cacti bootstrap. The isolated logic must match the production helper.
- */
+require_once dirname(__DIR__) . '/Helpers/CactiStubs.php';
+require_once dirname(__DIR__, 2) . '/include/global.php';
 
-beforeAll(function () {
-	require_once dirname(__DIR__, 2) . '/include/global_constants.php';
-	require_once dirname(__DIR__, 2) . '/lib/functions.php';
-});
-
-/**
- * Inline mirror of the production helper, parameterized with the allowlist.
- * Used to exercise the algorithm without depending on the filesystem.
- */
-function resolve_theme_under(array $allowlist, $requested, $default) {
-	$requested = basename((string) $requested);
-
-	return isset($allowlist[$requested]) ? $requested : $default;
+// cacti_validate_theme() reads the configured default from
+// read_config_option('selected_theme'); in CLI context that resolves from the
+// $config['config_options_array'] cache, so seeding it controls the default.
+function set_configured_default_theme(string $theme) : void {
+	$GLOBALS['config'][OPTIONS_CLI]['selected_theme'] = $theme;
 }
 
-describe('cacti_validate_theme source contract', function () {
-	$src = file_get_contents(__DIR__ . '/../../lib/functions.php');
+test('valid requested theme returns itself', function () {
+	set_configured_default_theme('dark');
 
-	it('uses static cache so scandir runs once per request', function () use ($src) {
-		expect($src)->toContain('static $valid_themes');
-	});
-
-	it('requires both is_dir and is_file(rrdtheme.php) for allowlist entry', function () use ($src) {
-		expect($src)->toContain('is_dir($full)');
-		expect($src)->toContain("is_file(\$full . '/rrdtheme.php')");
-	});
-
-	it('applies basename() to requested value before allowlist check', function () use ($src) {
-		expect($src)->toContain('basename((string) $requested)');
-	});
-
-	it('falls back to a configured or modern default', function () use ($src) {
-		expect($src)->toContain("read_config_option('selected_theme')");
-		expect($src)->toContain("\$default = 'modern'");
-	});
+	expect(cacti_validate_theme('modern'))->toBe('modern');
 });
 
-describe('theme allowlist algorithm', function () {
-	$allow = array('modern' => true, 'classic' => true, 'midwinter' => true);
+test('invalid requested theme returns a valid configured default', function () {
+	set_configured_default_theme('dark');
 
-	it('accepts a valid theme', function () use ($allow) {
-		expect(resolve_theme_under($allow, 'modern', 'modern'))->toBe('modern');
-		expect(resolve_theme_under($allow, 'midwinter', 'modern'))->toBe('midwinter');
-	});
-
-	it('returns default for an invalid theme', function () use ($allow) {
-		expect(resolve_theme_under($allow, 'evil', 'modern'))->toBe('modern');
-	});
-
-	it('strips path traversal via basename', function () use ($allow) {
-		// basename('../../etc/passwd') => 'passwd'; not in allowlist; returns default
-		expect(resolve_theme_under($allow, '../../etc/passwd', 'modern'))->toBe('modern');
-		expect(resolve_theme_under($allow, '/etc/passwd', 'modern'))->toBe('modern');
-		expect(resolve_theme_under($allow, 'modern/../../etc/passwd', 'modern'))->toBe('modern');
-	});
-
-	it('rejects empty, dot, and double-dot', function () use ($allow) {
-		expect(resolve_theme_under($allow, '', 'modern'))->toBe('modern');
-		expect(resolve_theme_under($allow, '.', 'modern'))->toBe('modern');
-		expect(resolve_theme_under($allow, '..', 'modern'))->toBe('modern');
-	});
-
-	it('rejects theme names satisfying basename but not in allowlist', function () use ($allow) {
-		// The exploit category the plain-basename fix missed:
-		// attacker-placed directory with rrdtheme.php. Our allowlist is
-		// built from the real include/themes/ so this is blocked unless
-		// the attacker can write INTO include/themes/ (already game over).
-		expect(resolve_theme_under($allow, 'attacker_uploaded_theme', 'modern'))->toBe('modern');
-	});
-
-	it('is case-sensitive (filesystem names are case-sensitive on POSIX)', function () use ($allow) {
-		expect(resolve_theme_under($allow, 'MODERN', 'modern'))->toBe('modern');
-		expect(resolve_theme_under($allow, 'Modern', 'modern'))->toBe('modern');
-	});
-
-	it('coerces non-string input safely', function () use ($allow) {
-		expect(resolve_theme_under($allow, null, 'modern'))->toBe('modern');
-		expect(resolve_theme_under($allow, 0, 'modern'))->toBe('modern');
-		expect(resolve_theme_under($allow, false, 'modern'))->toBe('modern');
-	});
+	expect(cacti_validate_theme('does_not_exist'))->toBe('dark');
 });
 
-describe('theme ingress enforcement', function () {
-	$graphImageSource = file_get_contents(__DIR__ . '/../../graph_image.php');
-	$graphJsonSource  = file_get_contents(__DIR__ . '/../../graph_json.php');
-	$remoteSource     = file_get_contents(__DIR__ . '/../../remote_agent.php');
+test('invalid requested theme with a poisoned default returns the safe fallback', function () {
+	set_configured_default_theme('../../tmp/x');
 
-	it('uses cacti_validate_theme in graph_image request handling', function () use ($graphImageSource) {
-		expect($graphImageSource)->toContain("cacti_validate_theme(get_request_var('graph_theme'))");
-	});
+	$result = cacti_validate_theme('also_invalid');
 
-	it('uses cacti_validate_theme in graph_json request handling', function () use ($graphJsonSource) {
-		expect($graphJsonSource)->toContain("cacti_validate_theme(get_request_var('graph_theme'))");
-	});
+	expect($result)->toBe('modern')
+		->and($result)->not->toContain('..')
+		->and($result)->not->toContain('/');
+});
 
-	it('uses cacti_validate_theme in remote_agent graph handler', function () use ($remoteSource) {
-		expect($remoteSource)->toContain("cacti_validate_theme(get_request_var('graph_theme'))");
-	});
+test('traversal in the requested theme never escapes the theme set', function () {
+	set_configured_default_theme('dark');
+
+	$result = cacti_validate_theme('../../../etc/passwd');
+
+	expect($result)->not->toContain('..')
+		->and($result)->not->toContain('/')
+		->and(is_dir(CACTI_PATH_INCLUDE . '/themes/' . $result))->toBeTrue();
 });

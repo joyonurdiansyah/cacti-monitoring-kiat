@@ -2,7 +2,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2023 The Cacti Group                                 |
+ | Copyright (C) 2004-2025 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -37,27 +37,39 @@ function ss_hstats($host_id = 0, $stat = '') {
 	switch ($stat) {
 		case 'polling_time':
 			$column = $stat;
+
 			break;
 		case 'min_time':
 			$column = $stat;
+
 			break;
 		case 'max_time':
 			$column = $stat;
+
 			break;
 		case 'cur_time':
 			$column = $stat;
+
 			break;
 		case 'avg_time':
 			$column = $stat;
+
 			break;
 		case 'uptime':
 			$column = 'snmp_sysUpTimeInstance';
+
 			break;
 		case 'failed_polls':
 			$column = $stat;
+
 			break;
 		case 'availability':
 			$column = $stat;
+
+			break;
+		case 'current_errors':
+			$column = $stat;
+
 			break;
 		default:
 			return '0';
@@ -67,7 +79,7 @@ function ss_hstats($host_id = 0, $stat = '') {
 		$value = db_fetch_cell_prepared("SELECT $column
 			FROM host
 			WHERE id = ?",
-			array($host_id));
+			[$host_id]);
 
 		return ($value == '' ? 'U' : $value);
 	}

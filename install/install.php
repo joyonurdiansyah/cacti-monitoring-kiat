@@ -26,30 +26,32 @@ error_reporting(E_ALL);
 define('IN_CACTI_INSTALL', 1);
 
 include_once('../include/auth.php');
-require_once($config['base_path'] . '/lib/api_automation_tools.php');
-require_once($config['base_path'] . '/lib/api_automation.php');
-require_once($config['base_path'] . '/lib/api_data_source.php');
-require_once($config['base_path'] . '/lib/api_graph.php');
-require_once($config['base_path'] . '/lib/api_device.php');
-require_once($config['base_path'] . '/lib/api_tree.php');
-require_once($config['base_path'] . '/lib/data_query.php');
-require_once($config['base_path'] . '/lib/import.php');
-require_once($config['base_path'] . '/lib/poller.php');
-require_once($config['base_path'] . '/lib/snmp.php');
-require_once($config['base_path'] . '/lib/sort.php');
-require_once($config['base_path'] . '/lib/template.php');
-require_once($config['base_path'] . '/lib/utility.php');
+require_once(CACTI_PATH_LIBRARY . '/api_automation_tools.php');
+require_once(CACTI_PATH_LIBRARY . '/api_automation.php');
+require_once(CACTI_PATH_LIBRARY . '/api_data_source.php');
+require_once(CACTI_PATH_LIBRARY . '/api_graph.php');
+require_once(CACTI_PATH_LIBRARY . '/api_device.php');
+require_once(CACTI_PATH_LIBRARY . '/api_tree.php');
+require_once(CACTI_PATH_LIBRARY . '/data_query.php');
+require_once(CACTI_PATH_LIBRARY . '/import.php');
+require_once(CACTI_PATH_LIBRARY . '/poller.php');
+require_once(CACTI_PATH_LIBRARY . '/snmp.php');
+require_once(CACTI_PATH_LIBRARY . '/sort.php');
+require_once(CACTI_PATH_LIBRARY . '/template.php');
+require_once(CACTI_PATH_LIBRARY . '/utility.php');
 include_once('./functions.php');
 
 set_default_action();
 
 prime_default_settings();
 
-/***** SAFETY CHECKS FOR OLDER OR SECURED SYSTEMS ****/
+// SAFETY CHECKS FOR OLDER OR SECURED SYSTEMS
 $hasShellExec  = is_function_enabled('shell_exec');
 $hasExec       = is_function_enabled('exec');
 $hasJson       = interface_exists('JsonSerializable');
 $hasEverything = $hasJson && $hasShellExec && $hasExec;
+
+global $config;
 
 if ($hasEverything) {
 	include_once('../lib/installer.php');
@@ -57,14 +59,15 @@ if ($hasEverything) {
 
 $help = '';
 
-if ($config['cacti_server_os'] == 'unix') {
+if (CACTI_SERVER_OS == 'unix') {
 	if ($config['cacti_db_version'] == 'new_install') {
-		if (isset($_SERVER['SERVER_SOFTWARE']) && strpos($_SERVER['SERVER_SOFTWARE'], 'Apache') !== false) {
+		if (isset($_SERVER['SERVER_SOFTWARE']) && str_contains($_SERVER['SERVER_SOFTWARE'], 'Apache')) {
 			$help = 'Install-Under-CentOS_LAMP.html';
 		} elseif (file_exists('/etc/redhat-release')) {
 			$help = 'Install-Under-CentOS_LAMP.html';
 		} elseif (file_exists('/etc/os-release')) {
 			$contents = file_get_contents('/etc/os-release');
+
 			if (stripos($contents, 'debian') !== false || stripos($contents, 'ubuntu')) {
 				$help = 'Installing-Under-Ubuntu-Debian.html';
 			}
@@ -85,8 +88,9 @@ if ($config['cacti_server_os'] == 'unix') {
 }
 
 $help_anchor = '';
+
 if ($help != '') {
-	$help_anchor = '<a style="padding:2px" href="#" data-page="' . $help . '" title="' . __esc('Cacti Install Help') . '" class="helpPage menu_parent"><i class="far fa-question-circle"></i></a>';
+	$help_anchor = '<a style="padding:2px" href="#" data-page="' . $help . '" title="' . __esc('Cacti Install Help') . '" class="helpPage menu_parent"><i class="ti ti-help textHeaderDark"></i></a>';
 }
 
 ?>
@@ -94,35 +98,41 @@ if ($help != '') {
 <html>
 <head>
 <?php
-print html_common_header(__('Cacti Server v%s - Maintenance', CACTI_VERSION));
+
+html_common_header(__('Cacti Server v%s - Maintenance', format_cacti_version_text(CACTI_VERSION)));
+
 if ($hasEverything) {
 	print get_md5_include_js('install/install.js');
 }
+
 print get_md5_include_css('install/install.css');
+
 ?>
 </head>
 <body>
 	<div class='cactiInstallTable'>
 		<div class='cactiTableTitleRow cactiBorderWall'>
-			<div class='textHeaderDark'><?php print __esc('Cacti Server v%s - Installation Wizard', CACTI_VERSION); ?><span style="float:right"><?php print $help_anchor;?><a class="menu_parent" id="installRefresh" href="#" title="<?php print __esc('Refresh current page');?>" style="padding:2px"><i class="fa fa-redo"></i></a></span></div>
+			<div class='textHeaderDark'><?php print __esc('Cacti Server v%s - Installation Wizard', CACTI_VERSION_BRIEF_FULL); ?><span style="float:right"><?php print $help_anchor; ?><a class="menu_parent" id="installRefresh" href="#" title="<?php print __esc('Refresh current page'); ?>" style="padding:2px"><i class="ti ti-reload textHeaderDark"></i></a></span></div>
 		</div>
 		<div class='cactiInstallArea cactiBorderWall'>
 			<div class='cactiInstallAreaContent' id='installContent'>
 <?php
 if ($hasEverything) {
 	print Installer::sectionTitle(__('Initializing'));
-	print Installer::sectionNormal(__('Please wait while the installation system for Cacti Version %s initializes. You must have JavaScript enabled for this to work.', CACTI_VERSION));
+	print Installer::sectionNormal(__('Please wait while the installation system for Cacti Version %s initializes. You must have JavaScript enabled for this to work.', CACTI_VERSION_BRIEF_FULL));
 } else {
 	print '<div class="installErrorImage"><img src=\'../images/cacti_logo.svg\'></div>';
 	print '<div class="installErrorText">';
-	print '<p>' . __('FATAL: We are unable to continue with this installation. In order to install Cacti, PHP must be at version 5.4 or later.') . '</p>';
+	print '<p>' . __('FATAL: We are unable to continue with this installation. In order to install Cacti, PHP must be at version 7.4 or later.') . '</p>';
 	print '<ul>';
+
 	if (!$hasJson) {
 		print '<li>' . __('The php-json module must also be installed.') . '<br>' . __('See the PHP Manual: <a href="http://php.net/manual/en/book.json.php">JavaScript Object Notation</a>.') . '</li>';
 		print '<br>';
 	}
+
 	if (!($hasExec && $hasShellExec)) {
-		print '<li>' . __('The shell_exec() and/or exec() functions are currently blocked.') . '<br>' . __('See the PHP Manual: <a href="http://php.net/manual/en/ini.core.php#ini.disable-functions">Disable Functions</a>.') .'</li>';
+		print '<li>' . __('The shell_exec() and/or exec() functions are currently blocked.') . '<br>' . __('See the PHP Manual: <a href="http://php.net/manual/en/ini.core.php#ini.disable-functions">Disable Functions</a>.') . '</li>';
 	}
 	print '</ul></div>';
 }
@@ -134,16 +144,16 @@ if ($hasEverything) {
 			</div>
 		</div>
 		<div class='cactiInstallButtonArea saveRow'>
-			<input class='installButton' id='buttonPrevious' type='button' value='Previous' style='display: none'>
-			<input class='installButton' id='buttonNext' type='button' value='Next' style='display: none'>
-			<input class='installButton' id='buttonTest' type='button' value='Test' style='display:none'>
+			<button class='installButton' id='buttonPrevious' type='button' style='display: none'><?php print __esc('Previous'); ?></button>
+			<button class='installButton' id='buttonNext' type='button' style='display: none'><?php print __esc('Next'); ?></button>
+			<button class='installButton' id='buttonTest' type='button' style='display:none'><?php print __esc('Test'); ?></button>
 			<input id='installData' type='hidden'>
 		</div>
 		<div id='installDebug'></div>
-		<div class='cactiInstallCopyrightArea textHeaderDark'><?php print COPYRIGHT_YEARS;?></div>
+		<div class='cactiInstallCopyrightArea textHeaderDark'><?php print COPYRIGHT_YEARS; ?></div>
 	</div>
 <?php
-include_once(dirname(__FILE__) . '/../include/global_session.php');
+include_once(__DIR__ . '/../include/global_session.php');
 ?>
 </body>
 </html>

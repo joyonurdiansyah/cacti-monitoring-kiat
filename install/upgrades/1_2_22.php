@@ -22,11 +22,10 @@
  +-------------------------------------------------------------------------+
 */
 
-function upgrade_to_1_2_22() {
+function upgrade_to_1_2_22() : void {
 	global $config;
 
 	db_install_execute('ALTER TABLE host
 		MODIFY COLUMN `deleted` CHAR(2) NOT NULL default "",
 		MODIFY COLUMN `disabled` CHAR(2) NOT NULL default ""');
 }
-

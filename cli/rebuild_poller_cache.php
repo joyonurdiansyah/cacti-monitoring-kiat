@@ -33,42 +33,46 @@ ini_set('output_buffering', 'Off');
 
 require(__DIR__ . '/../include/cli_check.php');
 
-require_once($config['base_path'] . '/lib/utility.php');
-require_once($config['base_path'] . '/lib/api_data_source.php');
-require_once($config['base_path'] . '/lib/poller.php');
+require_once(CACTI_PATH_LIBRARY . '/utility.php');
+require_once(CACTI_PATH_LIBRARY . '/api_data_source.php');
+require_once(CACTI_PATH_LIBRARY . '/poller.php');
 
-/* switch to main database for cli's */
-if ($config['poller_id'] > 1) {
+// switch to main database for cli's
+if (POLLER_ID > 1) {
 	db_switch_remote_to_main();
 }
 
-/* process calling arguments */
+// process calling arguments
 $parms = $_SERVER['argv'];
 array_shift($parms);
 
-/* system controlled parameters */
+// system controlled parameters
 $type              = 'rmaster';
 $thread_id         = 0;
 
-/* mandatory parameters */
+// mandatory parameters
 $start_time        = false;
 $end_time          = false;
 
-/* optional parameters for host selection */
+// optional parameters for host selection
 $debug            = false;
-$host_id          = false;
-$host_template_id = false;
-$data_template_id = false;
+$host_id          = 0;
+$host_template_id = 0;
+$data_template_id = 0;
 
-/* optional for threading and verbose display */
-$threads          = read_config_option('commands_processes') ?? 5;
+// optional for threading and verbose display
+$threads           = detect_cpu_cores();
 
-/* optional for force handing and resume */
-$forcerun         = false;
+if ($threads == 0) {
+	$threads = 2;
+}
+
+// optional for force handing and resume
+$forcerun = false;
 
 foreach ($parms as $parameter) {
-	if (strpos($parameter, '=')) {
-		list($arg, $value) = explode('=', $parameter, 2);
+	if (str_contains($parameter, '=')) {
+		[$arg, $value] = explode('=', $parameter, 2);
 	} else {
 		$arg   = $parameter;
 		$value = '';
@@ -76,9 +80,9 @@ foreach ($parms as $parameter) {
 
 	switch ($arg) {
 		case '--host-id':
-			$host_id = trim($value);
+			$host_id = intval($value);
 
-			if (!is_numeric($host_id)) {
+			if ($host_id <= 0) {
 				print 'ERROR: You must supply a valid Device Id to run this script!' . PHP_EOL;
 
 				exit(1);
@@ -86,9 +90,9 @@ foreach ($parms as $parameter) {
 
 			break;
 		case '--host-template-id':
-			$host_template_id = trim($value);
+			$host_template_id = intval($value);
 
-			if (!is_numeric($host_template_id)) {
+			if ($host_template_id <= 0) {
 				print 'ERROR: You must supply a valid Device Template Id to run this script!' . PHP_EOL;
 
 				exit(1);
@@ -96,9 +100,9 @@ foreach ($parms as $parameter) {
 
 			break;
 		case '--data-template-id':
-			$data_template_id = trim($value);
+			$data_template_id = intval($value);
 
-			if (!is_numeric($data_template_id)) {
+			if ($data_template_id <= 0) {
 				print 'ERROR: You must supply a valid Data Template Id to run this script!' . PHP_EOL;
 
 				exit(1);
@@ -112,6 +116,7 @@ foreach ($parms as $parameter) {
 		case '--threads':
 			if (!is_numeric(trim($value))) {
 				print 'ERROR: You must supply a valid Number of Treads or skip this parameter for default value (' . $threads . ')' . PHP_EOL;
+
 				exit(1);
 			}
 
@@ -136,90 +141,98 @@ foreach ($parms as $parameter) {
 		case '--help':
 			display_help();
 
-			exit(0);
+			exit;
 		case '-v':
 		case '-V':
 		case '--version':
 			display_version();
 
-			exit(0);
+			exit;
+
 		default:
 			print 'ERROR: Invalid Parameter ' . $parameter . PHP_EOL . PHP_EOL;
 
 			display_help();
 
-			exit(1);
+			exit;
 	}
 }
 
-/* install signal handlers for UNIX only */
+/**
+ * allow multiple runs for each type. This is mainly important for
+ * the Data Template options to change the Profile Id of a data
+ * source or data template.  These processes to repopulate the
+ * poller cache are done in succession in background.
+ */
+$rp_type = '';
+
+if ($host_id > 0) {
+	$rp_type .= ($rp_type != '' ? ',' : ':') . "hi:$host_id";
+}
+
+if ($host_template_id > 0) {
+	$rp_type .= ($rp_type != '' ? ',' : ':') . "ht:$host_template_id";
+}
+
+if ($data_template_id > 0) {
+	$rp_type .= ($rp_type != '' ? ',' : ':') . "dt:$data_template_id";
+}
+
+// install signal handlers for UNIX only
 if (function_exists('pcntl_signal')) {
 	pcntl_signal(SIGTERM, 'sig_handler');
 	pcntl_signal(SIGINT, 'sig_handler');
 }
 
-/* take time and log performance data */
+// take time and log performance data
 $start = microtime(true);
 
-/* set new timeout and memory settings */
+// set new timeout and memory settings
 ini_set('max_execution_time', '0');
 ini_set('memory_limit', '-1');
 
-$sql_where = '';
-$params    = array();
-
-if ($host_id > 0) {
-	$sql_where = ' AND h.id = ?';
-	$params[]  = $host_id;
-}
-
-if ($host_template_id > 0) {
-	$sql_where .= ' AND h.host_template_id = ?';
-	$params[] = $host_template_id;
-}
-
-/* issue warnings and start message if applicable */
+// issue warnings and start message if applicable
 print 'WARNING: Do not interrupt this script.  Rebuilding Poller Cache can take quite some time' . PHP_EOL;
 
-/* send a gentle message to the log and stdout */
+// send a gentle message to the log and stdout
 pushout_debug('Rebuild poller cache starting');
 
-/* silently end if the registered process is still running  */
+// silently end if the registered process is still running
 if (!$forcerun) {
-	if (!register_process_start('pushout', $type, $thread_id, 86400)) {
+	if (!register_process_start('pushout' . $rp_type, $type, $thread_id, 86400)) {
 		exit(0);
 	}
 }
 
-/* Collect data as determined by the type */
+// Collect data as determined by the type
 switch ($type) {
 	case 'rmaster':
 		pushout_master_handler($forcerun, $host_id, $host_template_id, $data_template_id, $threads);
 
-		unregister_process('pushout', 'rmaster', 0);
+		unregister_process('pushout' . $rp_type, 'rmaster', 0);
 
 		break;
-	case 'child':  /* Launched by the rmaster process */
+	case 'child':  // Launched by the rmaster process
 		$child_start = microtime(true);
 
 		$sql_where  = '';
-		$sql_params = array();
+		$sql_params = [];
 
-		if ($host_id !== false) {
+		if ($host_id > 0) {
 			$sql_where .= 'AND id = ?';
 			$sql_params[] = $host_id;
 		}
 
-		if ($host_template_id !== false) {
+		if ($host_template_id > 0) {
 			$sql_where .= 'AND host_template_id = ?';
 			$sql_params[] = $host_template_id;
 		}
 
-		$rows = db_fetch_cell_prepared("SELECT count(id) FROM host WHERE disabled='' " . $sql_where, $sql_params);
+		$rows = db_fetch_cell_prepared("SELECT COUNT(id) FROM host WHERE disabled = '' " . $sql_where, $sql_params);
 
-		$hosts_per_process = ceil($rows/$threads);
+		$hosts_per_process = ceil($rows / $threads);
 
-		$sql_where .= ' GROUP BY h.id ORDER BY h.id LIMIT ' . (($thread_id-1)*$hosts_per_process) . ',' . $hosts_per_process;
+		$sql_where .= ' GROUP BY h.id ORDER BY h.id LIMIT ' . (($thread_id - 1) * $hosts_per_process) . ',' . $hosts_per_process;
 
 		$rows = db_fetch_assoc_prepared("SELECT h.id AS id, COUNT(dl.id) AS dl_count
 			FROM host AS h
@@ -228,7 +241,7 @@ switch ($type) {
 			WHERE h.disabled='' " . $sql_where,
 			$sql_params);
 
-		cacti_log(sprintf('Child Started Process %s with %d hosts, from: %d', $thread_id, $hosts_per_process, ($thread_id-1)*$hosts_per_process), true, 'PUSHOUT');
+		cacti_log(sprintf('Child Started Process %s with %d hosts, from: %d', $thread_id, $hosts_per_process, ($thread_id - 1) * $hosts_per_process), true, 'PUSHOUT');
 
 		foreach ($rows as $row) {
 			if (!$debug) {
@@ -238,13 +251,13 @@ switch ($type) {
 			if ($row['dl_count'] > 0) {
 				push_out_host($row['id'], 0, $data_template_id);
 			} else {
-				db_execute_prepared('DELETE FROM poller_item WHERE host_id = ?', array($row['id']));
+				db_execute_prepared('DELETE FROM poller_item WHERE host_id = ?', [$row['id']]);
 			}
 		}
 
 		$total_time = microtime(true) - $child_start;
 
-		unregister_process('pushout', 'child', $thread_id);
+		unregister_process('pushout' . $rp_type, 'child', $thread_id);
 
 		break;
 }
@@ -253,18 +266,18 @@ pushout_debug('Polling Ending');
 
 exit(0);
 
-function pushout_master_handler($forcerun, $host_id, $host_template_id, $data_template_id, $threads) {
+function pushout_master_handler(bool $forcerun, int $host_id, int $host_template_id, int $data_template_id, int $threads) : bool {
 	global $type;
 
 	$sql_where  = '';
-	$sql_params = array();
+	$sql_params = [];
 
-	if ($host_id !== false) {
+	if ($host_id > 0) {
 		$sql_where .= 'AND id = ?';
 		$sql_params[] = $host_id;
 	}
 
-	if ($host_template_id !== false) {
+	if ($host_template_id > 0) {
 		$sql_where .= 'AND host_template_id = ?';
 		$sql_params[] = $host_template_id;
 	}
@@ -274,12 +287,12 @@ function pushout_master_handler($forcerun, $host_id, $host_template_id, $data_te
 		WHERE disabled = '' " . $sql_where, $sql_params);
 
 	if ($rows == 0) {
-		print 'WARNING: There are no hosts to process' . PHP_EOL;;
+		print 'WARNING: There are no hosts to process' . PHP_EOL;
 
 		return false;
 	}
 
-	$hosts_per_process = ceil($rows/$threads);
+	$hosts_per_process = ceil($rows / $threads);
 
 	print "There are $rows hosts, $threads threads and $hosts_per_process hosts to process per thread" . PHP_EOL;
 
@@ -297,7 +310,6 @@ function pushout_master_handler($forcerun, $host_id, $host_template_id, $data_te
 
 	while (true) {
 		if ($starting) {
-
 			sleep(5);
 			$starting = false;
 		}
@@ -317,127 +329,90 @@ function pushout_master_handler($forcerun, $host_id, $host_template_id, $data_te
 
 /**
  * pushout_launch_child - this function will launch collector children based upon
- *   the maximum number of threads and the process type
+ * the maximum number of threads and the process type
  *
- * @param $thread_id  (int)    The Thread id to launch
+ * @param int $thread_id The Thread id to launch with
+ * @param int $threads   The number of threads to run with
  *
- * @return - NULL
+ * @return void
  */
-function pushout_launch_child($thread_id, $threads) {
+function pushout_launch_child(int $thread_id, int $threads) : void {
 	global $config, $debug, $host_template_id, $data_template_id;
 
 	$php_binary = read_config_option('path_php_binary');
 
 	pushout_debug(sprintf('Launching Rebuild poller cache Process Number %s for Type %s', $thread_id, 'child'));
 
-	cacti_log(sprintf('NOTE: Launching Push out hosts Number %s for Type %s', $thread_id, 'child'), true, 'PUSHOUT', POLLER_VERBOSITY_MEDIUM);
+	cacti_log(sprintf('NOTE: Launching Rebuild poller cache Number %s for Type %s', $thread_id, 'child'), true, 'PUSHOUT', POLLER_VERBOSITY_MEDIUM);
 
-	exec_background($php_binary, $config['base_path'] . "/cli/push_out_hosts.php --type=child --threads=$threads --child=$thread_id " . ($debug ? " --debug":"") . ($host_template_id ? " --host-template-id=$host_template_id":"") . ($data_template_id ? " --data-template-id=$data_template_id":""));
+	exec_background($php_binary, CACTI_PATH_CLI . "/rebuild_poller_cache.php --type=child --threads=$threads --child=$thread_id " . ($debug ? ' --debug' : '') . ($host_template_id ? " --host-template-id=$host_template_id" : '') . ($data_template_id ? " --data-template-id=$data_template_id" : ''));
 }
 
 /**
  * pushout_processes_running - given a type, determine the number
- *   of sub-type or children that are currently running
+ * of sub-type or children that are currently running
  *
- * @return - (int) The number of running processes
+ * @return int - The number of running processes
  */
-function pushout_processes_running() {
+function pushout_processes_running() : int {
 	$running = db_fetch_cell('SELECT COUNT(*)
 		FROM processes
 		WHERE tasktype = "pushout"
 		AND taskname = "child"');
 
-	if ($running == 0) {
-		return 0;
-	}
-
-	return $running;
+	return intval($running);
 }
 
 /**
  * pushout_debug - this simple routine prints a standard message to the console
- *   when running in debug mode.
+ * when running in debug mode.
  *
- * @param $message - (string) The message to display
+ * @param string $message The message to display
  *
- * @return - NULL
+ * @return void
  */
-function pushout_debug($message) {
+function pushout_debug(string $message) : void {
 	global $debug;
 
 	if ($debug) {
-		print 'PUSHOUT: ' . $message . PHP_EOL;
+		print 'PUSHOUT: ' . trim($message) . PHP_EOL;
 	}
-}
-
-/**
- * display_version - displays version information
- */
-function display_version() {
-	print 'Cacti Rebuild poller cache Tool, Version ' . CACTI_VERSION . ' ' . COPYRIGHT_YEARS . PHP_EOL;
-}
-
-/**
- * display_help - generic help screen for utilities
- */
-function display_help() {
-	display_version();
-
-	print PHP_EOL . 'usage: rebuild_poller_cache.php [--host-id=N] [--host-template-id=N] [--data-template-id=N] [--debug]' . PHP_EOL . PHP_EOL;
-
-	print 'Cacti\'s repopulate poller cache tool.  This CLI script will ' . PHP_EOL;
-	print 'repopulate poller cache for all or specified hosts.' . PHP_EOL . PHP_EOL;
-	print 'This utility will run in parallel with the given number of threads,' . PHP_EOL;
-
-	print 'Optional:' . PHP_EOL;
-	print ' --threads=N           - The number of threads to use to repopulate, default = 5' . PHP_EOL;
-	print ' --host-id=N           - Run for a specific Device' . PHP_EOL;
-	print ' --host-template-id=N  - Run for a specific Device Template' . PHP_EOL;
-	print ' --data-template-id=N  - Run for a specific Data Template' . PHP_EOL;
-	print ' --debug               - Display verbose output during execution' . PHP_EOL . PHP_EOL;
-
-	print 'System Controlled:' . PHP_EOL;
-	print ' --type      - The type and subtype of the rebuild poller cache process' . PHP_EOL;
-	print ' --child     - The thread id of the child process' . PHP_EOL . PHP_EOL;
 }
 
 /**
  * sig_handler - provides a generic means to catch exceptions to the Cacti log.
  *
- * @param $signo - (int) the signal that was thrown by the interface.
+ * @param int $signo The signal that was thrown by the interface.
  *
- * @return - null
+ * @return void
  */
-function sig_handler($signo) {
-	global $type, $thread_id;
+function sig_handler(int $signo) : void {
+	global $type, $thread_id, $rp_type;
 
 	switch ($signo) {
 		case SIGTERM:
 		case SIGINT:
 			cacti_log('WARNING: Rebuild poller cache terminated by user', false, 'PUSHOUT');
 
-			if (strpos($type, 'rmaster') !== false) {
+			if (str_contains($type, 'rmaster')) {
 				pushout_kill_running_processes();
 			}
 
-			unregister_process('pushout', 'rmaster', $thread_id, getmypid());
+			unregister_process('pushout' . $rp_type, 'rmaster', $thread_id, getmypid());
 
 			exit(1);
-
-			break;
-
 		default:
-			/* ignore all other signals */
+			// ignore all other signals
 	}
 }
 
 /**
  * pushout_kill_running_processes - this function is part of an interrupt
- *   handler to kill children processes when the parent is killed
+ * handler to kill children processes when the parent is killed
  *
- * @return - NULL
+ * @return void
  */
-function pushout_kill_running_processes() {
+function pushout_kill_running_processes() : void {
 	global $type;
 
 	$processes = db_fetch_assoc_prepared('SELECT *
@@ -445,7 +420,7 @@ function pushout_kill_running_processes() {
 		WHERE tasktype = "pushout"
 		AND taskname IN ("child")
 		AND pid != ?',
-		array(getmypid()));
+		[getmypid()]);
 
 	if (cacti_sizeof($processes)) {
 		foreach ($processes as $p) {
@@ -457,3 +432,40 @@ function pushout_kill_running_processes() {
 	}
 }
 
+/**
+ * display_version - displays version information
+ *
+ * @return void
+ */
+function display_version() : void {
+	print 'Cacti Rebuild poller cache Tool, Version ' . CACTI_VERSION . ' ' . COPYRIGHT_YEARS . PHP_EOL;
+}
+
+/**
+ * display_help - generic help screen for utilities
+ *
+ * @return void
+ */
+function display_help() : void {
+	display_version();
+
+	print PHP_EOL . 'usage: rebuild_poller_cache.php [--host-id=N] [--host-template-id=N] [--data-template-id=N] [--debug]' . PHP_EOL . PHP_EOL;
+
+	print 'Cacti\'s repopulate poller cache tool.  This CLI script will ' . PHP_EOL;
+	print 'repopulate poller cache for all or specified hosts.' . PHP_EOL . PHP_EOL;
+
+	print 'This utility will run in parallel with the given number of threads.' . PHP_EOL;
+	print 'If threads argument is not specified, value is derived from the number of processor cores.' . PHP_EOL;
+	print 'In case of a detection problem, 2 threads are used.' . PHP_EOL . PHP_EOL;
+
+	print 'Optional:' . PHP_EOL;
+	print ' --threads=N           - The number of threads to use to repopulate' . PHP_EOL;
+	print ' --host-id=N           - Run for a specific Device' . PHP_EOL;
+	print ' --host-template-id=N  - Run for a specific Device Template' . PHP_EOL;
+	print ' --data-template-id=N  - Run for a specific Data Template' . PHP_EOL;
+	print ' --debug               - Display verbose output during execution' . PHP_EOL . PHP_EOL;
+
+	print 'System Controlled:' . PHP_EOL;
+	print ' --type                - The type and subtype of the rebuild poller cache process' . PHP_EOL;
+	print ' --child               - The thread id of the child process' . PHP_EOL . PHP_EOL;
+}

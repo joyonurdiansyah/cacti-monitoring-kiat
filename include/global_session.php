@@ -24,42 +24,23 @@
 
 global $config, $refresh, $messages;
 
-if (isset($_SESSION['automation_message']) && $_SESSION['automation_message'] != '') {
-	$messages['automation_message'] = array(
-		'message' => $_SESSION['automation_message'],
-		'type' => 'info'
-	);
-	kill_session_var('automation_message');
-}
+$script = get_current_script_name();
+$graphs = false;
 
-if (isset($_SESSION['clog_message']) && $_SESSION['clog_message'] != '') {
-	$messages['clog_message'] = array(
-		'message' => $_SESSION['clog_message'],
-		'type' => 'info'
-	);
-	kill_session_var('clog_message');
-}
-
-if (isset($_SESSION['clog_error']) && $_SESSION['clog_error'] != '') {
-	$messages['clog_error'] = array(
-		'message' => $_SESSION['clog_error'],
-		'type' => 'error'
-	);
-	kill_session_var('clog_error');
-}
-
-$script = basename($_SERVER['SCRIPT_NAME']);
 if ($script == 'graph_view.php' || $script == 'graph.php') {
+	$graphs = true;
+
 	if (isset($_SESSION['custom']) && $_SESSION['custom'] == true) {
 		$refreshIsLogout = 'true';
-	} elseif (isset_request_var('action') && get_nfilter_request_var('action') == 'zoom') {
+	} elseif (isrv('action') && gnrv('action') == 'zoom') {
 		$refreshIsLogout = 'true';
 	} else {
-		$refresh = api_plugin_hook_function('top_graph_refresh', read_user_setting('page_refresh'));
+		$refresh         = api_plugin_hook_function('top_graph_refresh', read_user_setting('page_refresh'));
 		$refreshIsLogout = 'false';
 	}
 } elseif (strstr($_SERVER['SCRIPT_NAME'], 'plugins')) {
 	$refresh = api_plugin_hook_function('top_graph_refresh', $refresh);
+
 	if (empty($refresh)) {
 		$refreshIsLogout = 'true';
 	} else {
@@ -74,27 +55,27 @@ if (isset($_SESSION['refresh'])) {
 		$myrefresh['seconds'] = ini_get('session.gc_maxlifetime');
 	}
 
-    if (isset($_SESSION['refresh']['logout'])) {
-        $refreshIsLogout = $_SESSION['refresh']['logout'];
-    } else {
+	if (isset($_SESSION['refresh']['logout'])) {
+		$refreshIsLogout = $_SESSION['refresh']['logout'];
+	} else {
 		$refreshIsLogout = 'false';
 	}
 
-    if (isset($_SESSION['refresh']['page'])) {
-        $myrefresh['page'] = sanitize_uri($_SESSION['refresh']['page']);
-    } else {
-		$myrefresh['page'] = $config['url_path'] . 'logout.php?action=timeout';
+	if (isset($_SESSION['refresh']['page'])) {
+		$myrefresh['page'] = sanitize_uri($_SESSION['refresh']['page']);
+	} else {
+		$myrefresh['page'] = CACTI_PATH_URL . 'logout.php?action=timeout';
 		$refreshIsLogout   = 'true';
 	}
 
 	unset($_SESSION['refresh']);
 } elseif (isset($refresh) && is_array($refresh)) {
 	$myrefresh['seconds'] = $refresh['seconds'];
-	$myrefresh['page']    = sanitize_uri(appendHeaderSuppression($refresh['page']));
+	$myrefresh['page']    = sanitize_uri($refresh['page']);
 	$refreshIsLogout      = 'false';
 } elseif (isset($refresh)) {
 	$myrefresh['seconds'] = $refresh;
-	$myrefresh['page']    = sanitize_uri(appendHeaderSuppression($_SERVER['REQUEST_URI']));
+	$myrefresh['page']    = sanitize_uri($_SERVER['REQUEST_URI']);
 	$refreshIsLogout      = 'false';
 } elseif (read_config_option('auth_cache_enabled') == 'on' && isset($_SESSION['cacti_remembers']) && $_SESSION['cacti_remembers'] == true) {
 	$myrefresh['seconds'] = 99999999;
@@ -102,48 +83,55 @@ if (isset($_SESSION['refresh'])) {
 	$refreshIsLogout      = 'false';
 } elseif (read_user_setting('user_auto_logout_time') > 0 && is_realm_allowed(8)) {
 	$myrefresh['seconds'] = read_user_setting('user_auto_logout_time');
-	$myrefresh['page']    = $config['url_path'] . 'logout.php?action=timeout';
+	$myrefresh['page']    = CACTI_PATH_URL . 'logout.php?action=timeout';
 	$refreshIsLogout      = 'true';
-} elseif (read_config_option('auth_method') == 2) {
+} elseif (read_config_option('auth_method') == AUTH_METHOD_BASIC) {
 	$myrefresh['seconds'] = 99999999;
 	$myrefresh['page']    = 'index.php';
 	$refreshIsLogout      = 'false';
-} elseif (!isset($_SESSION['sess_user_id']) && isset($_SERVER['REQUEST_URL']) && strpos($_SERVER['REQUEST_URI'], 'index.php') !== false) {
+} elseif (!isset($_SESSION[SESS_USER_ID]) && isset($_SERVER['REQUEST_URL']) && str_contains($_SERVER['REQUEST_URI'], 'index.php')) {
 	$myrefresh['seconds'] = 99999999;
 	$myrefresh['page']    = sanitize_uri($_SERVER['REQUEST_URI']);
 	$refreshIsLogout      = 'false';
 } else {
 	$myrefresh['seconds'] = ini_get('session.gc_maxlifetime');
-	$myrefresh['page']    = $config['url_path'] . 'logout.php?action=timeout';
+	$myrefresh['page']    = CACTI_PATH_URL . 'logout.php?action=timeout';
 	$refreshIsLogout      = 'true';
 }
 
-/* guest account does not auto log off */
-if (isset($_SESSION['sess_user_id']) && $_SESSION['sess_user_id'] == read_config_option('guest_user')) {
+// guest account does not auto log off
+if (isset($_SESSION[SESS_USER_ID]) && $_SESSION[SESS_USER_ID] == read_config_option('guest_user')) {
 	$myrefresh['seconds'] = 99999999;
 	$myrefresh['page']    = sanitize_uri($_SERVER['REQUEST_URI']);
 	$refreshIsLogout      = 'false';
 }
 
-/* basic auth times out when the auth provider times out */
+// basic auth times out when the auth provider times out
 if (read_config_option('auth_method') == 2) {
 	$myrefresh['seconds'] = 99999999;
 	$myrefresh['page']    = sanitize_uri($_SERVER['REQUEST_URI']);
-	$refreshIsLogout = 'false';
+	$refreshIsLogout      = 'false';
+}
+
+if ($graphs) {
+	$refresh_function = 'refreshGraphs()';
+} else {
+	$refresh_function = '';
 }
 
 ?>
-<script type='text/javascript' <?php print CactiSecureHeaders::getNonceAttribute();?>>
-	var cactiVersion='<?php print $config['cacti_version'];?>';
-	var cactiNonce='<?php print CactiSecureHeaders::getNonce();?>';
-	var cactiServerOS='<?php print $config['cacti_server_os'];?>';
-	var cactiAction='<?php print get_filter_request_var('action', FILTER_VALIDATE_REGEXP, array('options' => array('regexp' => '/^([-a-zA-Z0-9_\s]+)$/')));?>';
-	var theme='<?php print get_selected_theme();?>';
-	var refreshIsLogout=<?php print $refreshIsLogout;?>;
-	var refreshPage='<?php print $myrefresh['page'];?>';
-	var refreshMSeconds=<?php print $myrefresh['seconds']*1000;?>;
-	var urlPath='<?php print $config['url_path'];?>';
+<script type='text/javascript'>
+	var cactiVersion='<?php print $config['cacti_version']; ?>';
+	var cactiServerOS='<?php print CACTI_SERVER_OS; ?>';
+	var cactiAction='<?php print gfrv('action', FILTER_VALIDATE_REGEXP, ['options' => ['regexp' => '/^([-a-zA-Z0-9_\s]+)$/']]); ?>';
+	var theme='<?php print get_selected_theme(); ?>';
+	var refreshIsLogout=<?php print $refreshIsLogout; ?>;
+	var refreshPage='<?php print $myrefresh['page']; ?>';
+	var refreshMSeconds=<?php print $myrefresh['seconds'] * 1000; ?>;
+	var refreshFunction='<?php print $refresh_function; ?>';
 	var previousPage='';
-	var sessionMessage=<?php print display_output_messages(false);?>;
-	var csrfMagicToken='<?php print csrf_get_tokens();?>';
+	var sessionLocale='<?php print CACTI_LOCALE; ?>';
+	var sessionNotices=<?php print display_output_messages(); ?>;
+    var sessionMessage={};
+	var csrfMagicToken='<?php print csrf_get_tokens(); ?>';
 </script>

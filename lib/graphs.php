@@ -22,9 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
-function get_graph_template_details($local_graph_id) {
-	global $config;
-
+function get_graph_template_details(int $local_graph_id) : array {
 	$graph_local = db_fetch_row_prepared('SELECT gl.*, gt.name AS template_name, sqg.name AS query_name
 		FROM graph_local AS gl
 		LEFT JOIN graph_templates AS gt
@@ -32,79 +30,78 @@ function get_graph_template_details($local_graph_id) {
 		LEFT JOIN snmp_query_graph AS sqg
 		ON sqg.id = gl.snmp_query_graph_id
 		WHERE gl.id = ?',
-		array($local_graph_id));
+		[$local_graph_id]);
 
 	$aggregate = db_fetch_row_prepared('SELECT agt.id, agt.name
 		FROM aggregate_graphs AS ag
 		LEFT JOIN aggregate_graph_templates AS agt
 		ON ag.aggregate_template_id=agt.id
 		WHERE local_graph_id = ?',
-		array($local_graph_id));
+		[$local_graph_id]);
 
 	if (!empty($aggregate)) {
-		$url = $config['url_path'] . 'aggregate_graphs.php?action=edit&id=';
+		$url = CACTI_PATH_URL . 'aggregate_graphs.php?action=edit&id=';
 
 		if (!empty($aggregate['id'])) {
-			return array(
+			return [
 				'id'                => $local_graph_id,
 				'name'              => $aggregate['name'],
 				'graph_description' => __('Aggregated Device'),
 				'url'               => $url . $local_graph_id,
 				'source'            => GRAPH_SOURCE_AGGREGATE,
-			);
+			];
 		} else {
-			return array(
+			return [
 				'id'                => $local_graph_id,
 				'name'              => __('Not Templated'),
 				'graph_description' => __('Not Applicable'),
 				'url'               => $url . $local_graph_id,
 				'source'            => GRAPH_SOURCE_AGGREGATE,
-			);
+			];
 		}
 	} elseif ($graph_local['graph_template_id'] == 0) {
-		return array(
+		return [
 			'id'     => $local_graph_id,
 			'name'   => __('Not Templated'),
 			'url'    => '',
 			'source' => GRAPH_SOURCE_PLAIN,
-		);
+		];
 	} elseif ($graph_local['snmp_query_id'] > 0 && $graph_local['snmp_query_graph_id'] > 0) {
-		$url = $config['url_path'] . 'data_queries.php' .
+		$url = CACTI_PATH_URL . 'data_queries.php' .
 			'?action=item_edit' .
 			'&id=' . $graph_local['snmp_query_graph_id'] .
 			'&snmp_query_id=' . $graph_local['snmp_query_id'];
 
-		return array(
+		return [
 			'id'     => $graph_local['snmp_query_graph_id'],
 			'name'   => (!empty($graph_local['query_name']) ? $graph_local['query_name'] : __('Not Found')),
 			'url'    => $url,
 			'source' => GRAPH_SOURCE_DATA_QUERY
-		);
+		];
 	} elseif ($graph_local['snmp_query_id'] > 0 && $graph_local['snmp_query_graph_id'] == 0) {
-		return array(
+		return [
 			'id'     => 0,
 			'name'   => __('Damaged Graph'),
 			'url'    => '',
 			'source' => GRAPH_SOURCE_DATA_QUERY
-		);
+		];
 	} else {
 		if (!empty($graph_local['template_name'])) {
-			$url = $config['url_path'] . 'graph_templates.php?action=template_edit&id=' . $graph_local['graph_template_id'];
+			$url = CACTI_PATH_URL . 'graph_templates.php?action=template_edit&id=' . $graph_local['graph_template_id'];
 
-			return array(
+			return [
 				'id'     => $graph_local['graph_template_id'],
 				'name'   => $graph_local['template_name'],
 				'url'    => $url,
 				'source' => GRAPH_SOURCE_TEMPLATE,
-			);
+			];
 		} else {
-			return array(
+			return [
 				'id'     => 0,
 				'name'   => __('Not Found'),
 				'url'    => '',
 				'source' => GRAPH_SOURCE_TEMPLATE,
-			);
+			];
 		}
 	}
 }
-

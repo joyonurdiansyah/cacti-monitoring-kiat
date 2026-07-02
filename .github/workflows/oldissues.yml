@@ -1,5 +1,5 @@
 # +-------------------------------------------------------------------------+
-# | Copyright (C) 2004-2024 The Cacti Group                                 |
+# | Copyright (C) 2004-2026 The Cacti Group                                 |
 # |                                                                         |
 # | This program is free software; you can redistribute it and/or           |
 # | modify it under the terms of the GNU General Public License             |
@@ -25,16 +25,20 @@ on:
   schedule:
   - cron: '0 0 * * *'
 
+permissions:
+  issues: write #  to close stale issues (actions/stale)
+  pull-requests: write #  to close stale PRs (actions/stale)
+
 jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/stale@v3
+    - uses: actions/stale@v10
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-        days-before-stale: 60
-        days-before-close: 7
+        days-before-stale: 365
+        days-before-close: 30
         remove-stale-when-updated: true
 
         exempt-issue-labels: 'pinned, security, enhancement, future release'
@@ -57,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: dessant/lock-threads@v2.0.0
+    - uses: dessant/lock-threads@v6.0.2
       with:
         github-token: ${{ github.token }}
         repo-token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,24 +1,24 @@
 <?php
 
-include_once(dirname(__FILE__) . '/../include/cli_check.php');
-include_once(dirname(__FILE__) . '/../lib/snmp.php');
+include_once(__DIR__ . '/../include/cli_check.php');
+include_once(__DIR__ . '/../lib/snmp.php');
 
 if (!isset($called_by_script_server)) {
 	array_shift($_SERVER['argv']);
 	print call_user_func_array('ss_multicpu_avg', $_SERVER['argv']);
 }
 
-function ss_multicpu_avg($device_id) {
+function ss_multicpu_avg(int $device_id) : string {
 	$host = db_fetch_row_prepared('SELECT *
 		FROM host
 		WHERE id = ?',
-		array($device_id));
+		[$device_id]);
 
 	if (!cacti_sizeof($host)) {
 		return "load:0\n";
 	}
 
-    $snmp_retries = read_config_option('snmp_retries');
+	$snmp_retries = read_config_option('snmp_retries');
 
 	$oid_cpus = '.1.3.6.1.2.1.25.3.3.1.2';
 
@@ -41,8 +41,8 @@ function ss_multicpu_avg($device_id) {
 	$load = 0;
 
 	if (cacti_sizeof($array)) {
-		foreach ($array as $key=>$value)	{
-		    $load += $value['value'];
+		foreach ($array as $key=>$value) {
+			$load += $value['value'];
 		}
 	} else {
 		return "load:0\n";
@@ -52,4 +52,3 @@ function ss_multicpu_avg($device_id) {
 
 	return "load:$load\n";
 }
-

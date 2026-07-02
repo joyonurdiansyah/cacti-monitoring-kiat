@@ -22,22 +22,25 @@
   +-------------------------------------------------------------------------+
 */
 
-function update_hash($file) {
+function update_hash(string $file) : void {
 }
 
-function file_search($folder, $pattern_array) {
-	$return = array();
-	$iti = new RecursiveDirectoryIterator($folder);
-	foreach(new RecursiveIteratorIterator($iti) as $file){
+function file_search(string $folder, array $pattern_array) : array {
+	$return = [];
+	$iti    = new RecursiveDirectoryIterator($folder);
+
+	foreach (new RecursiveIteratorIterator($iti) as $file) {
 		$fileParts = explode('.', $file);
-		if (in_array(strtolower(array_pop($fileParts)), $pattern_array)){
+
+		if (in_array(cacti_strtolower(array_pop($fileParts)), $pattern_array, true)) {
 			$return[] = $file;
 		}
 	}
+
 	return $return;
 }
 
-function file_hash($match) {
+function file_hash(array $match) : string {
 	global $cssFile;
 	$md5File = dirname($cssFile) . '/' . $match[2];
 	$md5Real = realpath($md5File);
@@ -47,23 +50,23 @@ function file_hash($match) {
 	return $result;
 }
 
-function file_update($cssFile) {
+function file_update(string $cssFile) : void {
 	$fileContents = file($cssFile);
 	$fileUpdated  = preg_replace_callback_array(
 		[
 			'/(@import url\(\')([^?]*)(\?.*)*(\'\))/' => 'file_hash',
-			'/(@import url\(")([^?]*)(\?.*)*("\))/' => 'file_hash',
+			'/(@import url\(")([^?]*)(\?.*)*("\))/'   => 'file_hash',
 		], $fileContents
 	);
 
 	if ($fileContents != $fileUpdated) {
-		echo "file_update(" . $cssFile . ")\n";
+		print 'file_update(' . $cssFile . ")\n";
 		file_put_contents($cssFile, $fileUpdated);
 	}
 }
 
 global $cssFile;
-$cssFiles = file_search(__DIR__ . '/css', ['css']);
+$cssFiles   = file_search(__DIR__ . '/css', ['css']);
 $cssFiles[] = __DIR__ . '/main.css';
 $cssFiles[] = __DIR__ . '/billboard.midwinter.css';
 
@@ -71,4 +74,4 @@ foreach ($cssFiles as $cssFile) {
 	file_update($cssFile);
 }
 
-echo PHP_EOL;
+print PHP_EOL;

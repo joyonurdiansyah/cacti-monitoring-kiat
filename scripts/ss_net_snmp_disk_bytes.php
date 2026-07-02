@@ -2,7 +2,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2023 The Cacti Group                                 |
+ | Copyright (C) 2004-2025 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -26,58 +26,94 @@
 global $config;
 
 if (!isset($called_by_script_server)) {
-	include_once(dirname(__FILE__) . '/../include/cli_check.php');
-	include_once(dirname(__FILE__) . '/../lib/snmp.php');
+	include_once(__DIR__ . '/../include/cli_check.php');
+	include_once(__DIR__ . '/../lib/snmp.php');
 
 	array_shift($_SERVER['argv']);
 
 	print call_user_func_array('ss_net_snmp_disk_bytes', $_SERVER['argv']);
 } else {
-	include_once(dirname(__FILE__) . '/../lib/snmp.php');
+	include_once(__DIR__ . '/../lib/snmp.php');
 }
 
 function ss_net_snmp_disk_bytes($host_id_or_hostname = '') {
 	global $environ, $poller_id, $config;
 
-	if (empty($host_id_or_hostname) || $host_id_or_hostname === NULL) {
+	if (empty($host_id_or_hostname) || $host_id_or_hostname === null) {
 		return 'reads:0 writes:0';
-	} elseif (!is_numeric($host_id_or_hostname)) {
+	}
+
+	if (!is_numeric($host_id_or_hostname)) {
 		$host_id = db_fetch_cell_prepared('SELECT id
 			FROM host
 			WHERE hostname = ?',
-			array($host_id_or_hostname));
+			[$host_id_or_hostname]);
 	} else {
 		$host_id = $host_id_or_hostname;
 	}
 
 	$tmpdir = sys_get_temp_dir();
 
-	if ($environ != 'realtime') {
-		$tmpdir = $tmpdir . '/cacti/net-snmp-devio';
-		$tmpfile = $host_id . '_bytes';
-	} else {
-		$tmpdir = $tmpdir . '/cacti-rt/net-snmp-devio';
-		$tmpfile = $host_id . '_' . $poller_id . '_bytes_rt';
-	}
+	if (!db_table_exists('host_value_cache')) {
+		if ($environ != 'realtime') {
+			$tmpdir .= '/cacti/net-snmp-devio';
+			$tmpfile = $host_id . '_bytes';
+		} else {
+			$tmpdir .= '/cacti-rt/net-snmp-devio';
+			$tmpfile = $host_id . '_' . $poller_id . '_bytes_rt';
+		}
 
-	if (!is_dir($tmpdir)) {
-		mkdir($tmpdir, 0777, true);
+		if (!is_dir($tmpdir)) {
+			mkdir($tmpdir, 0777, true);
+		}
+	} else {
+		if ($environ != 'realtime') {
+			$dimension = $host_id . '_bytes';
+			$ttl       = -1;
+		} else {
+			$dimension = $host_id . '_' . $poller_id . '_bytes_rt';
+			$ttl       = 300;
+		}
 	}
 
 	$found    = false;
-	$previous = array();
+	$previous = [];
 
-	if (is_file("$tmpdir/$tmpfile")) {
-		$previous = json_decode(file_get_contents("$tmpdir/$tmpfile"), true);
-		$found = true;
+	if (!db_table_exists('host_value_cache')) {
+		if (is_file("$tmpdir/$tmpfile")) {
+			$previous = json_decode(file_get_contents("$tmpdir/$tmpfile"), true);
+			$found    = true;
+		}
+	} else {
+		$previous = json_decode(
+			db_fetch_cell_prepared('SELECT value
+				FROM host_value_cache
+				WHERE host_id = ?
+				AND dimension = ?
+				LIMIT 1',
+				[$host_id, $dimension]), true
+		);
+
+		/* remove the old entry or entries */
+		db_execute_prepared('DELETE FROM host_value_cache
+			WHERE host_id = ?
+			AND dimension = ?
+			AND time_to_live = ?',
+			[$host_id, $dimension, $ttl]);
+
+		if (!empty($previous)) {
+			$found = true;
+		} else {
+			$found = false;
+		}
 	}
 
-	$indexes = array();
+	$indexes = [];
 
 	$host = db_fetch_row_prepared('SELECT *
 		FROM host
 		WHERE id = ?',
-		array($host_id));
+		[$host_id]);
 
 	if (!cacti_sizeof($host)) {
 		return 'reads:0 writes:0';
@@ -95,7 +131,7 @@ function ss_net_snmp_disk_bytes($host_id_or_hostname = '') {
 		$host['snmp_context'],
 		$host['snmp_port'],
 		$host['snmp_timeout'],
-		$host['ping_retries'],
+		$host['snmp_retries'],
 		SNMP_POLLER,
 		$host['snmp_engine_id']);
 
@@ -113,18 +149,19 @@ function ss_net_snmp_disk_bytes($host_id_or_hostname = '') {
 		$host['snmp_context'],
 		$host['snmp_port'],
 		$host['snmp_timeout'],
-		$host['ping_retries'],
+		$host['snmp_retries'],
 		SNMP_POLLER,
 		$host['snmp_engine_id']);
 
-	foreach($names as $measure) {
-		if (substr($measure['value'],0,2) == 'sd' || substr($measure['value'],0,4) == 'nvme' || substr($measure['value'],0,2) == 'vm') {
+	foreach ($names as $measure) {
+		if (str_starts_with($measure['value'], 'sd') || str_starts_with($measure['value'], 'nvme') || str_starts_with($measure['value'], 'vm')) {
 			if (is_numeric(substr(strrev($measure['value']),0,1))) {
 				continue;
 			}
 
 			$parts = explode('.', $measure['oid']);
-			$indexes[$parts[cacti_sizeof($parts)-1]] = $parts[cacti_sizeof($parts)-1];
+
+			$indexes[$parts[cacti_sizeof($parts) - 1]] = $parts[cacti_sizeof($parts) - 1];
 		}
 	}
 
@@ -143,14 +180,13 @@ function ss_net_snmp_disk_bytes($host_id_or_hostname = '') {
 			$host['snmp_context'],
 			$host['snmp_port'],
 			$host['snmp_timeout'],
-			$host['ping_retries'],
 			$host['max_oids'],
 			SNMP_POLLER,
 			$host['snmp_engine_id']);
 
-		foreach($bytes as $measure) {
+		foreach ($bytes as $measure) {
 			$parts = explode('.', $measure['oid']);
-			$index = $parts[cacti_sizeof($parts)-1];
+			$index = $parts[cacti_sizeof($parts) - 1];
 
 			if (array_key_exists($index, $indexes)) {
 				if (!isset($previous['uptime'])) {
@@ -189,14 +225,14 @@ function ss_net_snmp_disk_bytes($host_id_or_hostname = '') {
 			$host['snmp_context'],
 			$host['snmp_port'],
 			$host['snmp_timeout'],
-			$host['ping_retries'],
+			$host['snmp_retries'],
 			$host['max_oids'],
 			SNMP_POLLER,
 			$host['snmp_engine_id']);
 
-		foreach($bytes as $measure) {
+		foreach ($bytes as $measure) {
 			$parts = explode('.', $measure['oid']);
-			$index = $parts[cacti_sizeof($parts)-1];
+			$index = $parts[cacti_sizeof($parts) - 1];
 
 			if (array_key_exists($index, $indexes)) {
 				if (!isset($previous['uptime'])) {
@@ -223,8 +259,16 @@ function ss_net_snmp_disk_bytes($host_id_or_hostname = '') {
 			}
 		}
 
-		$data = json_encode($current);
-		file_put_contents("$tmpdir/$tmpfile", $data);
+		if (!db_table_exists('host_value_cache')) {
+			$data = json_encode($current);
+			file_put_contents("$tmpdir/$tmpfile", $data);
+		} else {
+			$data = json_encode($current);
+
+			db_execute_prepared('REPLACE INTO host_value_cache (host_id, dimension, value, time_to_live)
+				VALUES (?, ?, ?, ?)',
+				[$host_id, $dimension, $data, $ttl]);
+		}
 	}
 
 	if ($found) {
@@ -233,4 +277,3 @@ function ss_net_snmp_disk_bytes($host_id_or_hostname = '') {
 		return 'bytesread:0 byteswritten:0';
 	}
 }
-

@@ -1,654 +1,195 @@
-# Cacti Monitoring — Instalasi Multi-Site
+# Cacti
 
-Cacti **v1.2.31** — Network Monitoring Framework berbasis PHP, MySQL/MariaDB, dan RRDtool.
-
-Proyek ini digunakan untuk memonitor **84 perangkat jaringan** yang tersebar di 19 kota/region
-seluruh Indonesia (Balikpapan, Semarang, Makassar, Palu, Batam, dan lainnya) menggunakan
-Mikrotik RouterOS, Ubiquiti AP, dan perangkat Linux/Windows.
-
----
-
-## Perbandingan Versi: 1.2.26 vs 1.2.31
-
-Cacti 1.2.31 adalah **major security release** dengan 30+ perbaikan CVE dibanding 1.2.26.
-Berikut ringkasan perbedaan utama:
-
-### Riwayat Rilis
-
-| Versi | Tanggal | Catatan |
-|-------|---------|---------|
-| **1.2.26** | 24 Des 2023 | Versi awal project |
-| **1.2.27** | 12 Mei 2024 | 5 security fix (termasuk CVE-2024-25641 RCE) |
-| **1.2.28** | 6 Okt 2024 | 4 security fix, jQuery, jQueryUI, billboard.js update |
-| **1.2.29** | 2 Feb 2025 | 6 security fix, HPE Nimble/Alletra template |
-| **1.2.30** | 23 Mar 2025 | Bugfix only (6 issue) |
-| **1.2.31** | 15 Jun 2026 | **30+ security fix**, PHP 8.1 minimum |
-
-### Perubahan Penting
-
-| Aspek | 1.2.26 | 1.2.31 |
-|-------|--------|--------|
-| **PHP minimal** | 7.4+ | **8.1+** (breaking) |
-| **Security fix** | 6 CVE | **30+ CVE** (SQLi, XSS, RCE, Auth bypass, dll) |
-| **Device templates** | Bawaan | +Aruba Clearpass, HPE Nimble/Alletra, Dell iDRAC |
-| **Third-party libs** | jQuery 3.x lama | jQuery 3.7.1, jQueryUI 1.14.0, DOMPurify 3.4.7, PHPMailer 6.10 |
-| **jstree** | Versi lama | 3.3.17 (CSP Level 3 compliance) |
-
-### Perubahan Database (Schema)
-
-**Tidak ada tabel baru** antara 1.2.26 → 1.2.31. Hanya perubahan ALTER TABLE:
-
-| Versi | Perubahan |
-|-------|-----------|
-| 1.2.26 | `settings.value` dan `settings_user.value` diubah ke `varchar(4096)`; dedup tabel `colors` |
-| 1.2.27 | `snmp_priv_protocol` di 5 tabel diubah dari `char(6)` → `char(7)`; hapus duplikat `data_input_fields` |
-| 1.2.31 | `settings.name` dan `settings_user.name` diperlebar `varchar(75)` → `varchar(255)`; tambah index di `snmp_query_graph` |
-
-### Perubahan Menu / UI
-
-Tidak ada restrukturasi menu besar. Perubahan bersifat inkremental:
-
-| Versi | Perubahan UI |
-|-------|-------------|
-| 1.2.27 | Indikator device enabled/disabled di daftar graph; filter Device Templates by Graph Templates |
-| 1.2.28 | Kolom Location & Site di Graph List View; filter/sort user by group & last login; default graph end time 24 jam penuh |
-| 1.2.29 | IPv6 format tanpa port didukung |
-| 1.2.31 | Autocomplete standar di halaman Login & Change Password |
-
-### Keamanan Kritis di 1.2.31
-
-Beberapa CVE penting yang **tidak ada** di 1.2.26:
-
-| CVE | Kerentanan |
-|-----|-----------|
-| CVE-2026-39893 | **Pre-auth SQL injection** via rfilter RLIKE di graph_view.php |
-| CVE-2026-39894 | RRDtool metric shift via LC_NUMERIC locale comma |
-| CVE-2026-39949 | **Authenticated RCE** via Host Variable Injection |
-| CVE-2026-40078 | Backend ORDER BY SQL Injection |
-| CVE-2026-40082 | Session Fixation via missing session_regenerate_id() |
-| CVE-2026-40941 | Package Import Signature Validation Bypass |
-| CVE-2026-46531 | SQL Injection di automation_tree_rules.php |
-| CVE-2026-22802 | Authentication Bypass → information disclosure |
-
-**Kesimpulan:** Upgrade ke 1.2.31 wajib dilakukan karena menutup banyak celah keamanan kritis
-yang ada di 1.2.26, terutama pre-auth SQL injection dan RCE.
+[![Cacti Commit Audit](https://github.com/Cacti/cacti/actions/workflows/syntax.yml/badge.svg)](https://github.com/Cacti/cacti/actions/workflows/syntax.yml)
+[![Project Status](https://opensource.box.com/badges/active.svg)](https://opensource.box.com/badges)
+[![Translation Status](https://translate.cacti.net/widgets/cacti/-/core/svg-badge.svg)](https://translate.cacti.net)
+[![Average issue resolution time](https://isitmaintained.com/badge/resolution/cacti/cacti.svg)](https://isitmaintained.com/project/cacti/cacti)
+[![Open issues](https://isitmaintained.com/badge/open/cacti/cacti.svg)](https://isitmaintained.com/project/cacti/cacti)
 
 ---
 
-## Prasyarat
+## Overview
 
-### PHP
+Cacti is an open-source network monitoring and graphing platform built on RRDtool.
 
-| Requirement | Minimal |
-|-------------|---------|
-| **PHP** | >= 8.0 |
-| Ekstensi | `PDO`, `Phar`, `dom`, `gd`, `gmp`, `intl`, `json`, `ldap`, `mbstring`, `mysqlnd`, `openssl`, `pcntl`, `pdo_mysql`, `posix`, `sockets`, `sqlite3`, `xml` |
+It provides a scalable framework to collect, store, and visualize time-series data from network devices, servers, and applications.
 
-### Database
+Core capabilities include:
 
-| Requirement | Keterangan |
-|-------------|------------|
-| **Database** | MySQL 5.7+ / MariaDB 10.3+ |
-| **Koneksi** | `mysqli` / `pdo_mysql` |
-| **Charset** | `utf8mb4` |
-
-### Software Pendukung
-
-| Software | Kegunaan |
-|----------|----------|
-| **RRDtool** 1.4+ | Penyimpanan dan rendering grafik time-series |
-| **Net-SNMP** 5.7+ | Pengumpulan data SNMP dari perangkat |
-| **Spine / cactid** | Poller berkinerja tinggi (alternatif cmd.php) |
-| **Web Server** | Apache / Nginx + PHP-FPM |
-| **Composer** | Manajemen dependensi PHP |
-
-### Dependensi PHP (Composer)
-
-Dependensi sudah termasuk dalam `include/vendor/` dan tidak perlu diinstal ulang
-kecuali ada pembaruan:
-
-| Paket | Versi | Fungsi |
-|-------|-------|--------|
-| `ezyang/htmlpurifier` | ^4.19 | Sanitasi HTML |
-| `paragonie/constant_time_encoding` | ^2.0 | Encoding constant-time |
-| `paragonie/random_compat` | * | Fallback random untuk PHP |
-| `phpseclib/phpseclib` | ^3.0 | SSH/SFTP |
+- Automated device discovery
+- Local and remote data collection
+- Graph, data source, and RRA templating
+- SNMP polling (v1/v2/v3) and IPv6 support
+- Role-based access control (RBAC)
+- Plugin framework
+- Dynamic graph viewing and export options
 
 ---
 
-## Hal Penting Sebelum Instalasi
+## Release Branches
 
-### Permission Folder
+Cacti maintains two primary branches:
 
-Folder berikut harus **writable** oleh user web server (www-data/apache):
+| Branch | Purpose |
+|---|---|
+| `1.2.x` | Stable long-lived release series |
+| `develop` | Active development toward Cacti 1.3.x |
 
-| Folder | Fungsi |
-|--------|--------|
-| `log/` | File log Cacti (`cacti.log`) |
-| `cache/` | Cache boost, mibcache, realtime, spikekill |
-| `rra/` | File RRD (ratusan file .rrd) |
-| `resource/` | Resource CSS/JS (beberapa file di-generate runtime) |
+For the latest published version, see [GitHub Releases](https://github.com/Cacti/cacti/releases).
 
-Jika baru deploy, pastikan permission di-set:
+---
+
+## System Requirements
+
+Minimum supported dependencies by branch:
+
+| Dependency | Cacti `1.2.x` | Cacti `develop` (1.3.x) |
+|---|---|---|
+| MariaDB | 5.6+ | 10.2.x+ |
+| MySQL | 5.6+ | 8.0+ |
+| PHP | 8.1+ | 8.1+ |
+| RRDtool | 1.4+ | 1.8+ |
+| Net-SNMP | 5.5+ | 5.8+ |
+
+Notes:
+
+- RRDtool 1.9+ is recommended for newer dynamic graph features in 1.3.x.
+- Net-SNMP 5.9+ is recommended for broader SNMPv3 protocol coverage.
+- A web server with PHP support is required.
+- PHP should be available as CLI or CGI for scheduled polling and maintenance scripts.
+- `php-snmp` is optional; validate behavior carefully if you depend on IPv6 and SNMPv3.
+
+Operating system guidance:
+
+- `1.2.x`: RHEL/Rocky/Alma 8+ (or equivalent) is a common baseline.
+- `1.3.x`: RHEL/Rocky/Alma 9+ or CentOS Stream 9+ is preferred for modern PHP packaging.
+- Debian and Ubuntu are also well supported.
+
+---
+
+## Installation (Source Checkout)
+
+Clone the repository:
 
 ```bash
-chmod -R a+w log/ cache/ rra/ resource/
+git clone https://github.com/Cacti/cacti.git
+cd cacti
 ```
 
-### Config File
+Dependency management:
 
-File `include/config.php` berisi kredensial database dan **tidak boleh di-commit**
-(sudah masuk `.gitignore`). Gunakan `include/config.php.dist` sebagai template.
+- For a source checkout on both `1.2.x` and `develop`, install dependencies with Composer.
+- Use `composer update` only when intentionally refreshing dependency versions.
 
-### Database Tuning
-
-Beberapa tabel poller menggunakan engine `MEMORY` (poller_output, automation_ips,
-automation_processes, poller_output_boost_local_data_ids,
-poller_output_boost_processes). Pastikan `max_heap_table_size` di MySQL/MariaDB
-cukup besar (minimal 64M, disarankan 256M+).
-
-### Timezone
-
-Set timezone PHP dan MySQL/Waktu server harus **sinkron**. Cacti menyimpan waktu
-dalam `TIMESTAMP` (UTC) dan menampilkan sesuai timezone user.
-
----
-
-## Langkah Instalasi
-
-### Opsi A: Instalasi Manual (Linux)
-
-1.  **Clone repositori**
-
-    ```bash
-    git clone <repo-url> /var/www/html/cacti-monitoring
-    cd /var/www/html/cacti-monitoring
-    ```
-
-2.  **Buat database dan user**
-
-    ```sql
-    CREATE DATABASE cacti CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-    CREATE USER 'cactiuser'@'localhost' IDENTIFIED BY 'your-password-here';
-    GRANT ALL PRIVILEGES ON cacti.* TO 'cactiuser'@'localhost';
-    FLUSH PRIVILEGES;
-    ```
-
-3.  **Import skema database**
-
-    ```bash
-    mysql -u cactiuser -p cacti < cacti.sql
-    ```
-
-4.  **Konfigurasi Cacti**
-
-    ```bash
-    cp include/config.php.dist include/config.php
-    ```
-
-    Edit `include/config.php`:
-
-    ```php
-    $database_default  = 'cacti';
-    $database_hostname = 'localhost';
-    $database_username = 'cactiuser';
-    $database_password = 'your-password-here';
-    $database_port     = '3306';
-    $poller_id         = 1;
-    $url_path          = '/cacti-monitoring/';
-    ```
-
-5.  **Set permission folder**
-
-    ```bash
-    chmod -R a+w log/ cache/ rra/ resource/
-    ```
-
-6.  **Konfigurasi web server**
-
-    **Apache**: Gunakan `.htaccess.dist` sebagai referensi. Pastikan
-    `mod_rewrite` aktif dan `AllowOverride All` untuk direktori Cacti.
-
-    **Nginx**: Contoh konfigurasi ada di `tests/e2e/nginx.conf`.
-
-7.  **Selesaikan instalasi melalui web**
-
-    Buka `http://server-anda/cacti-monitoring/` di browser. Jika skema database
-    sudah di-import (langkah 3), instalasi akan mendeteksi bahwa Cacti sudah
-    terinstal dan langsung menampilkan halaman login.
-
-    **Login default:** `admin` / `admin`
-
-8.  **Konfigurasi Poller (Cron)**
-
-    Buka **Console > Configuration > Settings > Poller** dan pilih poller type:
-
-    - **cmd.php** (bawaan, cocok untuk < 100 device)
-    - **Spine / cactid** (direkomendasikan untuk > 100 device)
-
-    Tambahkan cron job untuk menjalankan poller setiap 5 menit:
-
-    ```cron
-    */5 * * * * apache php /var/www/html/cacti-monitoring/poller.php > /dev/null 2>&1
-    ```
-
-    Atau jika menggunakan Cacti Daemon (systemd):
-
-    ```bash
-    cp service/cactid.service /etc/systemd/system/
-    systemctl daemon-reload
-    systemctl enable --now cactid
-    ```
-
-    Edit `/etc/sysconfig/cactid` sesuai environment Anda.
-
-9.  **Verifikasi**
-
-    - Login ke Cacti
-    - Buka **Console > Management > Devices** — 84 perangkat akan terdaftar
-    - Buka **Console > Graph Trees** — tree per-kota/region sudah terbentuk
-    - Periksa `log/cacti.log` untuk memastikan poller berjalan
-
-### Opsi B: Instalasi Development (Docker Compose)
-
-> **Catatan:** Docker stack ini dirancang untuk **E2E testing**, bukan produksi.
+Install dependencies:
 
 ```bash
-cd tests/e2e
-docker compose up -d
+composer install
 ```
 
-Stack terdiri dari:
-- **MariaDB 10.11** — Database dengan seed `cacti.sql`
-- **PHP 7.4 FPM** — Runtime Cacti
-- **Nginx Alpine** — Web server (port 8080)
-
-Akses di `http://localhost:8080/` (login: `admin` / `admin`).
-
-Detail konfigurasi ada di `tests/e2e/docker-compose.yml` dan
-`tests/e2e/entrypoint.sh`. Variabel lingkungan yang digunakan:
-
-| Variabel | Default | Fungsi |
-|----------|---------|--------|
-| `CACTI_DB_HOST` | mariadb | Host database |
-| `CACTI_DB_NAME` | cacti | Nama database |
-| `CACTI_DB_USER` | cactiuser | User database |
-| `CACTI_DB_PASS` | cactipass | Password database |
-| `CACTI_DB_PORT` | 3306 | Port database |
-| `CACTI_CSP_MODE` | nonce-report | Mode CSP header |
-| `HOST_PORT` | 8080 | Port host untuk Nginx |
-
----
-
-## Konfigurasi Awal
-
-### `include/config.php`
-
-File ini adalah satu-satunya konfigurasi yang perlu diedit manual.
-Semua pengaturan lainnya dikelola melalui UI Cacti.
-
-```php
-// === Koneksi Database ===
-$database_type     = 'mysql';           // Jenis database
-$database_default  = 'cacti';           // Nama database
-$database_hostname = 'localhost';       // Host database
-$database_username = 'cactiuser';       // User database
-$database_password = '********';        // Password database
-$database_port     = '3306';            // Port database
-$database_retries  = 5;                 // Retry koneksi
-$database_ssl      = false;             // SSL database
-$database_persist  = false;             // Persistent connection
-
-// === Remote Poller (hanya untuk remote poller) ===
-#$rdatabase_type     = 'mysql';
-#$rdatabase_default  = 'cacti';
-#$rdatabase_hostname = 'remote-server';
-#$rdatabase_username = 'cactiuser';
-#$rdatabase_password = '********';
-#$rdatabase_port     = '3306';
-
-// === Poller ===
-$poller_id = 1;  // 1 = main server, >1 = remote poller
-
-// === URL Path ===
-$url_path = '/cacti-monitoring/';
-
-// === Session ===
-$cacti_session_name = 'Cacti';
-$cacti_db_session   = false;  // Simpan session di DB (untuk load balancing)
-
-// === Opsional ===
-// $scripts_path    = '/var/www/html/cacti/scripts';
-// $resource_path   = '/var/www/html/cacti/resource/';
-// $php_path        = '/bin/php';
-// $php_snmp_support = false;
-// $input_whitelist = '/usr/local/etc/cacti/input_whitelist.json';
-// $path_csrf_secret = '/usr/share/cacti/resource/csrf-secret.php';
-```
-
-### Database
-
-Setelah import `cacti.sql`, ada 109+ tabel. Beberapa tabel penting:
-
-| Tabel | Fungsi |
-|-------|--------|
-| `host` | Definisi perangkat (84 device) |
-| `graph_tree` | Definisi tree (Default Tree) |
-| `graph_tree_items` | Item tree (branch + device) |
-| `poller_item` | Item polling per device |
-| `poller_output` | Buffer hasil polling (MEMORY) |
-| `user_auth` | User accounts |
-| `settings` | Key-value global settings |
-| `plugin_config` | Registrasi plugin |
-
-### Poller / Cron
-
-**Cacti Daemon (cactid):** Jalankan sebagai systemd service:
+Windows users may need:
 
 ```bash
-# Edit path di service/cactid.service sesuai instalasi Anda
-# Default: /var/www/html/cacti/cactid.php
-cp service/cactid.service /etc/systemd/system/
-systemctl enable --now cactid
+composer install --ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix
 ```
 
-**Cron-based poller (cmd.php):**
+Then configure your database and web server, and complete setup using the official docs:
+
+https://github.com/Cacti/documentation
+
+---
+
+## Database Upgrades and Schema Checks
+
+When running from source (especially `develop`), schema updates may be required after pulling changes.
+
+Upgrade the database schema:
 
 ```bash
-# Poller utama — jalankan setiap 5 menit
-*/5 * * * * php /path/to/cacti/poller.php > /dev/null 2>&1
-
-# Poller automation — untuk network discovery
-*/5 * * * * php /path/to/cacti/poller_automation.php > /dev/null 2>&1
-
-# Poller boost — untuk performa (jika diaktifkan)
-*/5 * * * * php /path/to/cacti/poller_boost.php > /dev/null 2>&1
-
-# Poller dsstats — statistik data source (setiap jam)
-00 * * * * php /path/to/cacti/poller_dsstats.php > /dev/null 2>&1
-
-# Poller reports — laporan terjadwal
-*/5 * * * * php /path/to/cacti/poller_reports.php > /dev/null 2>&1
-
-# Poller spikekill — deteksi anomali (setiap 15 menit)
-*/15 * * * * php /path/to/cacti/poller_spikekill.php > /dev/null 2>&1
-
-# Poller maintenance — tugas maintenance (setiap jam)
-15 * * * * php /path/to/cacti/poller_maintenance.php > /dev/null 2>&1
-
-# Poller rrdcheck — verifikasi RRD file
-15 */6 * * * php /path/to/cacti/poller_rrdcheck.php > /dev/null 2>&1
+sudo -u cacti php -q cli/upgrade_database.php --forcever=`cat include/cacti_version`
 ```
 
-Lihat juga CLI scripts di `cli/` untuk berbagai tugas maintenance otomatis.
-
----
-
-## Struktur Tree Perangkat
-
-Tree telah direkonstruksi berdasarkan data produksi dengan branch per region:
-
-```
-Default Tree
-├── R225-MKA           │ Mikrotik R225
-├── P3                 │ Pangkalan 3
-├── _GATEWAY_          │ Gateway, Azure, Web server, DNS
-├── P5                 │ Pangkalan 5 — Bekasi
-├── P6                 │ Pangkalan 6 — Bekasi
-├── P12                │ Pangkalan 12 — Cileungsi
-├── PEKANBARU          │ R.202 Pekanbaru
-├── PALU               │ Distribusi, Sw Core, R.211
-├── BALI               │ R.243 Bali
-├── BANJARMASIN        │ R.210 Banjarmasin
-├── BATAM              │ R.201 Batam
-├── SEMARANG           │ Bacbone, R.205, Ubiquiti AP
-├── MAKASSAR           │ ASTINET, R.237, R.239
-├── MUARABARU          │ Quantum RAS, R.240
-├── PALEMBANG          │ R.204 Palembang
-├── MEDAN              │ R.212 Medan
-├── MANADO             │ R.209 Manado
-├── SURABAYA           │ Krian, Tambaksawah
-└── BALIKPAPAN         │ Bacbone, CS, Distribusi, SW Core
-```
-
-Perangkat ditempatkan ke branch yang sesuai dengan kota/lokasi masing-masing.
-Grafik dikelompokkan berdasarkan **Graph Template** (`host_grouping_type = 1`).
-
----
-
-## Menu Utama Cacti
-
-### Console
-
-Halaman utama setelah login. Menampilkan:
-
-- **Peringatan system** — log error, poller tidak jalan, dsb
-- **Availability** — ringkasan persentase uptime perangkat
-- **Tree Preview** — navigasi cepat ke branch tree
-- **User terakhir login**
-
-### Management
-
-| Submenu | Fungsi |
-|---------|--------|
-| **Devices** | Tambah/edit/hapus perangkat (saat ini 84 device) |
-| **Device Templates** | Template perangkat (Mikrotik, Linux, Generic SNMP) |
-| **Graphs** | Tambah/hapus grafik untuk perangkat |
-| **Graph Trees** | Kelola tree branch per region |
-| **Data Sources** | Lihat data source perangkat (.rrd files) |
-| **Sites** | Definisi situs/lokasi fisik |
-
-### Create
-
-| Submenu | Fungsi |
-|---------|--------|
-| **New Graphs** | Tambah grafik baru ke perangkat yang sudah ada |
-| **Devices** | Tambah perangkat baru (import atau manual) |
-
-### Templates
-
-| Submenu | Fungsi |
-|---------|--------|
-| **Graph Templates** | Template grafik (Interface Traffic, CPU, Memory, dll) |
-| **Host Templates** | Template perangkat SNMP |
-| **Data Templates** | Template data input untuk RRD |
-| **Data Queries** | XML-based SNMP data queries |
-| **CDEFs** | Custom math functions untuk grafik |
-| **VDEFs** | Vertical label definitions |
-| **Colors** | Manajemen warna grafik |
-| **Color Templates** | Kumpulan warna untuk grafik |
-| **GPRINT Presets** | Format tampilan angka di grafik |
-
-### Configuration
-
-| Submenu | Fungsi |
-|---------|--------|
-| **Settings** | Konfigurasi global Cacti (poller, path, auth, dll) |
-| **Collection** | Poller, Data Source Profiles, Availability |
-| **Authentication** | Authorization realms, user/group management |
-| **Visual** | Themes, graph settings, tree defaults |
-| **Weather** | Integrasi data cuaca (jika plugin weatherbug aktif) |
-
-### Users
-
-| Submenu | Fungsi |
-|---------|--------|
-| **User Management** | Tambah/edit user, grup, permission |
-| **User Domains** | Autentikasi via LDAP/AD (terintegrasi) |
-| **User Groups** | Grup permission untuk user |
-
-### Utilities
-
-| Submenu | Fungsi |
-|---------|--------|
-| **System Log** | View `log/cacti.log` |
-| **System Utilities** | Maintenance, audit database |
-| **Clear Filter** | Reset filter halaman |
-| **View Log** | Log user login/logout |
-| **Rebuild Poller Cache** | Rebuild cache setelah perubahan massal |
-| **Audit Database** | Verifikasi integritas database |
-| **Repair Database** | Perbaiki database jika ada masalah |
-
----
-
-## Plugin
-
-Project ini menggunakan **integrated plugins** (bawaan Cacti, tidak perlu instalasi
-terpisah):
-
-| Plugin | Fungsi |
-|--------|--------|
-| `snmpagent` | SNMP Agent bawaan Cacti |
-| `clog` | View log real-time di console |
-| `settings` | Settings tambahan |
-| `boost` | Performa boost untuk RRD update |
-| `dsstats` | Statistik data source |
-| `watermark` | Watermark pada grafik |
-| `ssl` | Manajemen SSL |
-| `ugroup` | User group management |
-| `domains` | Autentikasi domain/LDAP |
-| `jqueryskin` | Skin jQuery UI |
-| `secpass` | Kebijakan password |
-| `logrotate` | Rotasi log otomatis |
-| `realtime` | Grafik realtime |
-| `rrdclean` | Pembersihan RRD file |
-| `nectar` | Report engine (email reports) |
-| `aggregate` | Aggregate graphs |
-| `autom8` | Automation rules |
-| `discovery` | Network discovery (auto-add device) |
-| `spikekill` | Deteksi dan pembersihan spike data |
-| `superlinks` | Super links di grafik |
-| `debug` | Debugging tools |
-
-Plugin eksternal (`thold`, `monitor`) dapat diinstal melalui Plugin Management
-(`plugins.php`) atau secara manual di folder `plugins/`.
-
----
-
-## CLI Scripts
-
-Terdapat **47 script CLI** di folder `cli/` untuk otomatisasi:
-
-| Script | Fungsi |
-|--------|--------|
-| `add_device.php` | Tambah perangkat via CLI |
-| `add_graphs.php` | Tambah grafik ke perangkat |
-| `add_tree.php` | Kelola tree structure |
-| `import_package.php` | Import package template |
-| `import_template.php` | Import template XML |
-| `upgrade_database.php` | Upgrade database ke versi terbaru |
-| `install_cacti.php` | Instalasi CLI (tanpa web wizard) |
-| `repair_database.php` | Repair database |
-| `plugin_manage.php` | Install/uninstall plugin |
-| `rebuild_poller_cache.php` | Rebuild poller cache |
-| `poller_replicate.php` | Replikasi poller data |
-| `remove_device.php` | Hapus perangkat |
-| `reconstruct_tree.php` | Rekonstruksi tree per region |
-
----
-
-## Troubleshooting
-
-### 1. Poller Tidak Berjalan
-
-**Gejala:** Grafik tidak update, semua data terlihat flat/datar.
-
-**Cek:**
-```bash
-tail -f log/cacti.log | grep POLLER
-```
-
-Pastikan cron job atau systemd service berjalan:
-```bash
-systemctl status cactid
-# atau lihat cron:
-crontab -l | grep poller
-```
-
-### 2. Permission Error
-
-**Gejala:** Pesan "Log file is not available for writing" atau grafik putih.
-
-**Solusi:**
-```bash
-chmod -R a+w log/ cache/ rra/
-```
-
-### 3. Database Connection Error
-
-**Gejala:** Halaman putih atau error "Database connection failed".
-
-**Cek:**
-- Kredensial di `include/config.php`
-- MySQL/MariaDB service berjalan
-- User database memiliki akses dari host yang sesuai
-
-### 4. SNMP Timeout
-
-**Gejala:** Perangkat muncul dengan "SNMP not performed due to setting or ping result"
-atau "Device did not respond to SNMP".
-
-**Cek:**
-- SNMP community/credentials benar
-- Perangkat dapat di-ping dari server Cacti
-- Port 161/162 UDP terbuka di firewall
-- SNMP agent berjalan di perangkat
-
-### 5. Grafik Tidak Muncul / Putih
-
-**Cek:**
-- RRDtool terinstal: `which rrdtool`
-- Path RRDtool di **Settings > Paths** sudah benar
-- File .rrd ada di folder `rra/`
-
-### 6. Boost Cache Bermasalah
-
-Jika boost diaktifkan tapi data tidak muncul:
+If needed, force a re-upgrade from an earlier version:
 
 ```bash
-php cli/poller_output_empty.php
+php -q cli/upgrade_database.php --forcever=<older_version>
 ```
 
-### 7. Rebuild Cache Setelah Perubahan Massal
+Audit schema consistency:
 
 ```bash
-php cli/rebuild_poller_cache.php
+php cli/audit_database.php --report
 ```
 
-### 8. Log Cacti
+---
 
-Semua log ada di `log/`:
+## Data Collection and Polling
 
-| File | Isi |
-|------|-----|
-| `cacti.log` | Log utama Cacti |
-| `install-*.log` | Log instalasi |
+Cacti collects data through data sources, which can use:
 
-Aktifkan debug logging di **Console > Configuration > Settings > General** >
-**Log Level** → `DEBUG` untuk troubleshooting detail.
+- SNMP
+- Scripts
+- Command output
+- Databases
+- Custom input methods
+
+Polling engines:
+
+| Poller | Description |
+|---|---|
+| PHP Poller | Built-in polling engine |
+| Spine | High-performance C-based poller |
+
+Spine supports SNMPv1/v2 and SNMPv3 with IPv6, with some advanced protocol support depending on how Net-SNMP is compiled on your platform.
 
 ---
 
-## File Penting Referensi
+## Features
 
-| File | Deskripsi |
-|------|-----------|
-| `include/config.php.dist` | Template konfigurasi |
-| `include/config.php` | Konfigurasi aktual (jangan di-commit) |
-| `include/cacti_version` | Versi Cacti (1.2.31) |
-| `include/global.php` | Bootstrap utama Cacti |
-| `include/plugins.php` | Daftar integrated plugins |
-| `cacti.sql` | Full database schema + seed data |
-| `lib/api_tree.php` | API untuk manajemen tree |
-| `cli/reconstruct_tree.php` | Script rekonstruksi tree per region |
-| `service/cactid.service` | Systemd unit untuk Cacti Daemon |
-| `template_monitoring/` | Data export/import device |
+- Device discovery and automation workflows
+- Reusable templates for graphs and data sources
+- Distributed remote data collectors
+- Plugin architecture for extensibility
+- Dynamic graph interactions (time navigation, realtime view, CSV export)
+- Fine-grained user and group permissions using RBAC
+- Broad RRDtool graphing support (including VDEFs and stacked lines)
 
 ---
 
-## Lisensi
+## Documentation
 
-Project ini menggunakan Cacti yang dirilis di bawah lisensi **GPL-2.0-only**.
-Lihat file `LICENSE` untuk informasi lengkap.
+Official documentation is maintained in a separate repository:
 
-Cacti — Copyright (C) 2004-2026 The Cacti Group — https://www.cacti.net/
+https://github.com/Cacti/documentation
+
+---
+
+## Contributing
+
+Contributions are welcome.
+
+1. Fork this repository.
+2. Create a branch for your change.
+3. Submit a pull request.
+
+You can also help improve docs in:
+
+https://github.com/Cacti/documentation
+
+---
+
+## Community
+
+Community support is available on the Cacti forums:
+
+https://forums.cacti.net
+
+---
+
+## License
+
+Cacti is licensed under the GNU General Public License v2.0.
+
+See [LICENSE](./LICENSE) for details.
+
+Copyright (c) 2004-2026 The Cacti Group, Inc.

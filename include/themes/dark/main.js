@@ -21,14 +21,7 @@
   +-------------------------------------------------------------------------+
 */
 
-// Host Autocomplete Magic
-var pageName = basename($(location).attr('pathname'));
-
 function themeReady() {
-	var hostTimer = false;
-	var clickTimeout = false;
-	var hostOpen = false;
-
 	$('body').css('height', $(window).height());
 	$('.formItemDescription').hide();
 
@@ -38,23 +31,23 @@ function themeReady() {
 	setMenuVisibility();
 
 	// Add nice search filter to filters
-	if ($('input[id="filter"]').length > 0 && $('input[id="filter"] > i[class="fa fa-search filter"]').length < 1) {
-		$('input[id="filter"]').after("<i class='fa fa-search filter'/>").attr('autocomplete', 'off').attr('placeholder', searchFilter).parent('td').css('white-space', 'nowrap');
+	if ($('input[id="filter"]').length > 0 && $('input[id="filter"]').next('i[class="ti ti-search filter"]').length < 1) {
+		$('input[id="filter"]').after("<i class='ti ti-search filter'/>").attr('autocomplete', 'off').attr('placeholder', searchFilter).parent('td').css('white-space', 'nowrap');
 	}
 
-	if ($('input[id="filterd"]').length > 0 && $('input[id="filterd"] > i[class="fa fa-search filter"]').length < 1) {
-		$('input[id="filterd"]').after("<i class='fa fa-search filter'/>").attr('autocomplete', 'off').attr('placeholder', searchFilter).parent('td').css('white-space', 'nowrap');
+	if ($('input[id="filterd"]').length > 0 && $('input[id="filterd"]').next('i[class="ti ti-search filter"]').length < 1) {
+		$('input[id="filterd"]').after("<i class='ti ti-search filter'/>").attr('autocomplete', 'off').attr('placeholder', searchFilter).parent('td').css('white-space', 'nowrap');
 	}
 
-	if ($('input[id="rfilter"]').length > 0 && $('input[id="rfilter"] > i[class="fa fa-search filter"]').length < 1) {
-		$('input[id="rfilter"]').after("<i class='fa fa-search filter'/>").attr('autocomplete', 'off').attr('placeholder', searchRFilter).parent('td').css('white-space', 'nowrap');
+	if ($('input[id="rfilter"]').length > 0 && $('input[id="rfilter"]').next('i[class="ti ti-search filter"]').length < 1) {
+		$('input[id="rfilter"]').after("<i class='ti ti-search filter'/>").attr('autocomplete', 'off').attr('placeholder', searchRFilter).parent('td').css('white-space', 'nowrap');
 	}
 
 	$('input#filter, input#rfilter').addClass('ui-state-default ui-corner-all');
 
 	$('input[type="text"], input[type="password"], input[type="checkbox"], textarea').not('image').addClass('ui-state-default ui-corner-all');
 
-	$('.colordropdown').change(function() {
+	$('.colordropdown').on('change', function() {
 		id=$(this).attr('id');
 		color=$('#'+id+' option:selected').attr('data-color');
 		$('<span>', {
@@ -64,11 +57,11 @@ function themeReady() {
 	});
 
 	$('.checkboxgroup').children('br').remove();
-	$('.checkboxgroup').buttonset();
+	$('.checkboxgroup').controlgroup();
 
 	// Turn file buttons into jQueryUI buttons
 	$('.import_label').button();
-	$('.import_button').change(function() {
+	$('.import_button').on('change', function() {
 		text=this.value;
 		setImportFile(text);
 	});
@@ -80,37 +73,7 @@ function themeReady() {
 
 	maxWidth = 300;
 
-	$('select.colordropdown').dropcolor();
-
-	$('select').not('.colordropdown').each(function() {
-		if ($(this).prop('multiple') != true) {
-			$(this).each(function() {
-				id = $(this).attr('id');
-
-				$(this).selectmenu({
-					open: function(event, ui) {
-						var instance = $(this).selectmenu('instance');
-						instance.menuInstance.focus(null, instance._getSelectedItem());
-					},
-					change: function(event, ui) {
-						$(this).val(ui.item.value).change();
-					},
-					position: {
-						my: "left top",
-						at: "left bottom",
-						collision: "flip"
-					},
-					width: 'auto'
-				});
-
-				$('#'+id+'-menu').css('max-height', '250px');
-			});
-		} else {
-			$(this).addClass('ui-state-default ui-corner-all');
-		}
-	});
-
-	$('#drp_action').change(function() {
+	$('#drp_action').on('change', function() {
 		if ($(this).val() != '0') {
 			$('#submit').button('enable');
 		} else {
@@ -118,7 +81,7 @@ function themeReady() {
 		}
 	});
 
-	$('#graph_type_id').change(function() {
+	$('#graph_type_id').on('change', function() {
 		switch($(this).val()) {
 		case '4':
 		case '5':
@@ -129,95 +92,33 @@ function themeReady() {
 		}
 	});
 
-	$('#host').unbind().autocomplete({
-		source: pageName+'?action=ajax_hosts',
-		autoFocus: true,
-		minLength: 0,
-		select: function(event,ui) {
-			$('#host_id').val(ui.item.id);
-			callBack = $('#call_back').val();
-			if (callBack != 'undefined') {
-				if (callBack.indexOf('applyFilter') >= 0) {
-					applyFilter();
-				} else if (callBack.indexOf('applyGraphFilter') >= 0) {
-					applyGraphFilter();
-				}
-			} else if (typeof applyGraphFilter === 'function') {
-				applyGraphFilter();
-			} else {
-				applyFilter();
-			}
-		}
-	}).addClass('ui-state-default ui-selectmenu-text').css('border', 'none').css('background-color', 'transparent');
-
-	$('#host_click').css('z-index', '4');
-	$('#host_wrapper').unbind().dblclick(function() {
-		hostOpen = false;
-		clearTimeout(hostTimer);
-		clearTimeout(clickTimeout);
-		$('#host').autocomplete('close').select();
-	}).click(function() {
-		if (hostOpen) {
-			$('#host').autocomplete('close');
-			clearTimeout(hostTimer);
-			hostOpen = false;
-		} else {
-			clickTimeout = setTimeout(function() {
-				$('#host').autocomplete('search', '');
-				clearTimeout(hostTimer);
-				hostOpen = true;
-			}, 200);
-		}
-		$('#host').select();
-	}).on('mouseenter', function() {
-		$(this).addClass('ui-state-hover');
-		$('input#host').addClass('ui-state-hover');
-	}).on('mouseleave', function() {
-		$(this).removeClass('ui-state-hover');
-		$('#host').removeClass('ui-state-hover');
-		hostTimer = setTimeout(function() { $('#host').autocomplete('close'); }, 800);
-		hostOpen = false;
-	});
-
-	var hostPrefix = '';
-	$('#host').autocomplete('widget').each(function() {
-		hostPrefix=$(this).attr('id');
-
-		if (hostPrefix != '') {
-			$('ul[id="'+hostPrefix+'"]').on('mouseenter', function() {
-				clearTimeout(hostTimer);
-			}).on('mouseleave', function() {
-				hostTimer = setTimeout(function() { $('#host').autocomplete('close'); }, 800);
-				$(this).removeClass('ui-state-hover');
-				$('input#host').removeClass('ui-state-hover');
-			});
-		}
-	});
-
 	// Hide the graph icons until you hover
-	$('.graphDrillDown').hover(
-	function() {
-		element = $(this);
+	$('.graphDrillDown').on('mouseenter', function() {
+			element = $(this);
 
-		// hide the previously shown element
-		if (element.attr('id').replace('dd', '') != graphMenuElement && graphMenuElement > 0) {
-			$('#dd'+graphMenuElement).find('.iconWrapper:first').hide(300);
-		}
+			// hide the previously shown element
+			if (element.attr('id').replace('dd', '') != graphMenuElement && graphMenuElement > 0) {
+				$('#dd'+graphMenuElement).find('.iconWrapper:first').hide(300);
+			}
 
-		clearTimeout(graphMenuTimer);
-		graphMenuTimer = setTimeout(function() { showGraphMenu(element); }, 400);
-	},
-	function() {
-		element = $(this);
-		clearTimeout(graphMenuTimer);
-		graphMenuTimer = setTimeout(function() { hideGraphMenu(element); }, 400);
-	});
+			clearTimeout(graphMenuTimer);
+			graphMenuTimer = setTimeout(function() { showGraphMenu(element); }, 400);
+		}).on('mouseleave', function() {
+			element = $(this);
+			clearTimeout(graphMenuTimer);
+			graphMenuTimer = setTimeout(function() { hideGraphMenu(element); }, 400);
+
+			if (typeof spikeKillClose == 'function') {
+				spikeKillClose();
+			}
+		});
 
 	function showGraphMenu(element) {
 		element.find('.spikekillMenu').menu('disable');
 		element.find('.iconWrapper').show(300, function() {
 			graphMenuElement = element.attr('id').replace('dd', '');;
 			$(this).find('.spikekillMenu').menu('enable');
+			$(this).css('display', 'block');
 		});
 	}
 
@@ -232,7 +133,7 @@ function themeReady() {
 }
 
 function setMenuVisibility() {
-	storage=Storages.localStorage;
+	storage=Storages.sessionStorage;
 
 	// Initialize the navigation settings
 	// This will setup the initial visibility of the menu
@@ -265,7 +166,7 @@ function setMenuVisibility() {
 	});
 
 	// Function to give life to the Navigation pane
-	$('#nav li:has(ul) a.active').unbind().click(function(event) {
+	$('#nav li:has(ul) a.active').off('click').on('click', function(event) {
 		event.preventDefault();
 
 		id = $(this).closest('.menuitem').attr('id');

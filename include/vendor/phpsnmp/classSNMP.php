@@ -81,7 +81,7 @@ class SNMP {
 			$this->quick_print = snmp_get_quick_print();
 		}
 
-		$this->version  = $version;
+		$this->version = $version;
 
 		$delcount = substr_count($hostname, ':');
 
@@ -188,7 +188,7 @@ class SNMP {
 			$output[$oid] = $function_name($this->hostname, $this->community, $oid,
 				$this->version, $this->username, $this->auth_pass, $this->auth_proto,
 				$this->priv_pass, $this->priv_proto, $this->contextName, $this->port,
-				$this->timeout, $this->retries, SNMP_POLLER, $this->contextEngineID,
+				$this->timeout, $this->retries, 'SNMP', $this->contextEngineID,
 				$this->value_output_format);
 		}
 
@@ -228,7 +228,7 @@ class SNMP {
 		$result = cacti_snmp_walk($this->hostname, $this->community, $oid, $this->version,
 			$this->username, $this->auth_pass, $this->auth_proto, $this->priv_pass,
 			$this->priv_proto, $this->contextName, $this->port, $this->timeout,
-			$this->retries, $max_repetitions, SNMP_POLLER, $this->contextEngineID,
+			$this->retries, $max_repetitions, 'SNMP', $this->contextEngineID,
 			$this->value_output_format);
 
 		if ($result === false) {
@@ -254,50 +254,57 @@ class SNMP {
 
 	function set($oid, $type, $value) {
 		trigger_error('set function is not implemented', E_WARNING);
+
 		return false;
 	}
 
 	function __set($name, $value) {
 		switch ($name) {
-		case 'info':
-			trigger_error('info property is read-only', E_WARNING);
-			return false;
+			case 'info':
+				trigger_error('info property is read-only', E_WARNING);
 
-		case 'valuretrieval':
-			switch ($value) {
-			case SNMP_VALUE_LIBRARY:
-			case SNMP_VALUE_PLAIN:
-			case SNMP_VALUE_OBJECT:
-				$this->$name = $value;
-				return true;
-			default:
-				trigger_error("Unknown SNMP value retrieval method '$value'", E_WARNING);
 				return false;
+			case 'valuretrieval':
+				switch ($value) {
+					case SNMP_VALUE_LIBRARY:
+					case SNMP_VALUE_PLAIN:
+					case SNMP_VALUE_OBJECT:
+						$this->$name = $value;
 
-			}
-		break;
-		case 'oid_output_format':
-			switch ($value) {
-			case SNMP_OID_OUTPUT_SUFFIX:
-			case SNMP_OID_OUTPUT_MODULE:
-			case SNMP_OID_OUTPUT_FULL:
-			case SNMP_OID_OUTPUT_NUMERIC:
-			case SNMP_OID_OUTPUT_UCD:
-			case SNMP_OID_OUTPUT_NONE:
-				$this->$name = $value;
-				return true;
+						return true;
+					default:
+						trigger_error("Unknown SNMP value retrieval method '$value'", E_WARNING);
+
+						return false;
+				}
+			case 'oid_output_format':
+				switch ($value) {
+					case SNMP_OID_OUTPUT_SUFFIX:
+					case SNMP_OID_OUTPUT_MODULE:
+					case SNMP_OID_OUTPUT_FULL:
+					case SNMP_OID_OUTPUT_NUMERIC:
+					case SNMP_OID_OUTPUT_UCD:
+					case SNMP_OID_OUTPUT_NONE:
+						$this->$name = $value;
+
+						return true;
+					default:
+						trigger_error("Unknown SNMP output print format '$value'", E_WARNING);
+
+						return false;
+					}
+			case 'max_oids':
+			case 'enum_print':
+			case 'quick_print':
 			default:
-				trigger_error("Unknown SNMP output print format '$value'", E_WARNING);
-				return false;
-			}
-		break;
-		case 'max_oids':
-		case 'enum_print':
-		case 'quick_print':
-		default:
-			$this->$name = $value;
-		break;
+				$this->$name = $value;
+
+				break;
 		}
+	}
+
+	public function getType(): string {
+		return "SNMP class";
 	}
 }
 

@@ -1,4 +1,4 @@
-# Description: Standard Formating
+# Description: Standard Formatting
 # Theme: classic
 <style type='text/css'>
 
@@ -14,6 +14,10 @@ table {
 	text-align: center;
 	align-content: center;
 	width: 100%;
+}
+
+h3 {
+	margin: 3px;
 }
 
 .report_table {

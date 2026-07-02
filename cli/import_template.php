@@ -24,16 +24,16 @@
 */
 
 require(__DIR__ . '/../include/cli_check.php');
-require_once($config['base_path'] . '/lib/import.php');
-require_once($config['base_path'] . '/lib/poller.php');
-require_once($config['base_path'] . '/lib/utility.php');
+require_once(CACTI_PATH_LIBRARY . '/import.php');
+require_once(CACTI_PATH_LIBRARY . '/poller.php');
+require_once(CACTI_PATH_LIBRARY . '/utility.php');
 
-/* switch to main database for cli's */
-if ($config['poller_id'] > 1) {
+// switch to main database for cli's
+if (POLLER_ID > 1) {
 	db_switch_remote_to_main();
 }
 
-/* process calling arguments */
+// process calling arguments
 $parms = $_SERVER['argv'];
 array_shift($parms);
 
@@ -47,11 +47,11 @@ if (cacti_sizeof($parms)) {
 	$preview_only    = 0;
 	$profile_id      = '';
 
-	foreach($parms as $parameter) {
-		if (strpos($parameter, '=')) {
-			list($arg, $value) = explode('=', $parameter, 2);
+	foreach ($parms as $parameter) {
+		if (str_contains($parameter, '=')) {
+			[$arg, $value] = explode('=', $parameter, 2);
 		} else {
-			$arg = $parameter;
+			$arg   = $parameter;
 			$value = '';
 		}
 
@@ -73,34 +73,38 @@ if (cacti_sizeof($parms)) {
 
 				break;
 			case '--preview':
-				$preview_only = 1;
+				$preview_only = true;
 
 				break;
 			case '--profile-id':
-				$profile_id = trim($value);
+				$profile_id = intval($value);
 
 				break;
 			case '--help':
 			case '-H':
 			case '-h':
 				display_help();
+
 				exit(0);
 			case '--version':
 			case '-V':
 			case '-v':
 				display_version();
+
 				exit(0);
+
 			default:
 				print 'ERROR: Invalid Argument: ($arg)' . PHP_EOL . PHP_EOL;
+
 				exit(1);
 		}
 	}
 
-	if($profile_id > 0) {
+	if ($profile_id > 0) {
 		if ($with_profile) {
 			print "WARNING: '--with-profile' and '--profile-id=N' are exclusive. Ignoring '--with-profile'" . PHP_EOL;
 		} else {
-			$id = db_fetch_cell_prepared('SELECT id FROM data_source_profiles WHERE id = ?', array($profile_id));
+			$id = db_fetch_cell_prepared('SELECT id FROM data_source_profiles WHERE id = ?', [$profile_id]);
 
 			if (empty($id)) {
 				print "WARNING: Data Source Profile ID $profile_id not found. Using System Default" . PHP_EOL;
@@ -113,12 +117,13 @@ if (cacti_sizeof($parms)) {
 
 	if (empty($id)) {
 		print 'FATAL: No valid Data Source Profiles found on the system.  Exiting!' . PHP_EOL;
+
 		exit(1);
 	}
 
 	if ($filename != '') {
-		if(file_exists($filename) && is_readable($filename)) {
-			$fp = fopen($filename,'r');
+		if (file_exists($filename) && is_readable($filename)) {
+			$fp       = fopen($filename,'r');
 			$xml_data = fread($fp,filesize($filename));
 			fclose($fp);
 
@@ -126,36 +131,51 @@ if (cacti_sizeof($parms)) {
 
 			$debug_data = import_xml_data($xml_data, false, $id, $remove_orphans, $replace_svalues);
 
-			import_display_results($debug_data, array(), $preview_only);
+			import_display_results($debug_data, [], $preview_only);
 		} else {
 			print "ERROR: file $filename is not readable, or does not exist" . PHP_EOL . PHP_EOL;
+
 			exit(1);
 		}
 	} else {
 		print 'ERROR: no filename specified' . PHP_EOL . PHP_EOL;
 		display_help();
+
 		exit(1);
 	}
 } else {
 	print 'ERROR: no parameters given' . PHP_EOL . PHP_EOL;
 	display_help();
+
 	exit(1);
 }
 
-/*  display_version - displays version information */
-function display_version() {
+/**
+ * display_version - displays version information
+ *
+ * @return void
+ */
+function display_version() : void {
 	$version = get_cacti_cli_version();
 	print "Cacti Import Template Utility, Version $version, " . COPYRIGHT_YEARS . PHP_EOL;
 }
 
-function display_help() {
+/**
+ * display_help - displays the usage of the function
+ *
+ * @return void
+ */
+function display_help() : void {
 	display_version();
 
 	print PHP_EOL;
 	print 'usage: import_template.php --filename=[filename] [--with-profile | --profile-id=N]' . PHP_EOL . PHP_EOL;
+
 	print 'A utility to allow Cacti Templates to be imported from the command line.' . PHP_EOL . PHP_EOL;
+
 	print 'Required:' . PHP_EOL;
 	print '    --filename        The name of the XML file to import' . PHP_EOL . PHP_EOL;
+
 	print 'Optional:' . PHP_EOL;
 	print '    --preview         Preview the Template Import, do not import' . PHP_EOL;
 	print '    --with-profile    Use the default system Data Source Profile' . PHP_EOL;

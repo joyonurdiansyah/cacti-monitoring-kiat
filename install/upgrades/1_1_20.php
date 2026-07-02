@@ -22,7 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
-function upgrade_to_1_1_20() {
+function upgrade_to_1_1_20() : void {
 	db_install_execute('ALTER TABLE snmpagent_cache
 		MODIFY COLUMN `oid` VARCHAR(50) NOT NULL,
 		MODIFY COLUMN `name` VARCHAR(50) NOT NULL,
@@ -42,7 +42,7 @@ function upgrade_to_1_1_20() {
 		MODIFY COLUMN `mib` VARCHAR(50) NOT NULL,
 		MODIFY COLUMN `attribute` VARCHAR(50) NOT NULL');
 
-	db_install_add_key('snmpagent_cache_notifications', 'key', 'PRIMARY', array('name', 'mib', 'attribute', 'sequence_id'));
+	db_install_add_key('snmpagent_cache_notifications', 'key', 'PRIMARY', ['name', 'mib', 'attribute', 'sequence_id']);
 
 	db_install_drop_key('snmpagent_cache_textual_conventions', 'key', 'PRIMARY');
 
@@ -51,9 +51,9 @@ function upgrade_to_1_1_20() {
 		MODIFY COLUMN mib VARCHAR(50) NOT NULL,
 		MODIFY COLUMN type VARCHAR(50) NOT NULL');
 
-	db_install_add_key('snmpagent_cache_textual_conventions', 'key', 'PRIMARY', array('name' , 'mib', 'type'));
+	db_install_add_key('snmpagent_cache_textual_conventions', 'key', 'PRIMARY', ['name', 'mib', 'type']);
 
-	/* correct duplicate notifications */
+	// correct duplicate notifications
 	$notifications_results = db_install_fetch_assoc('SELECT *, COUNT(*) AS totals
 		FROM snmpagent_managers_notifications
 		GROUP BY manager_id, notification, mib
@@ -61,7 +61,7 @@ function upgrade_to_1_1_20() {
 	$notifications = $notifications_results['data'];
 
 	if (cacti_sizeof($notifications)) {
-		foreach($notifications as $n) {
+		foreach ($notifications as $n) {
 			$totals = $n['totals'];
 
 			db_install_execute("DELETE FROM snmpagent_managers_notifications
@@ -69,7 +69,7 @@ function upgrade_to_1_1_20() {
 				AND notification = ?
 				AND mib = ?
 				LIMIT $totals",
-				array($n['manager_id'], $n['notification'], $n['mib']));
+				[$n['manager_id'], $n['notification'], $n['mib']]);
 		}
 	}
 
@@ -79,5 +79,5 @@ function upgrade_to_1_1_20() {
 		MODIFY COLUMN `notification` VARCHAR(50) NOT NULL,
 		MODIFY COLUMN `mib` VARCHAR(50) NOT NULL');
 
-	db_install_add_key('snmpagent_managers_notifications', 'key', 'PRIMARY', array('manager_id', 'notification', 'mib'));
+	db_install_add_key('snmpagent_managers_notifications', 'key', 'PRIMARY', ['manager_id', 'notification', 'mib']);
 }

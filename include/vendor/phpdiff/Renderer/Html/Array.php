@@ -195,7 +195,8 @@ class Diff_Renderer_Html_Array extends Diff_Renderer_Abstract
 
 			if ($spaces != '') {
 				$count = strlen($spaces);
-				if($count == 0) {
+
+				if ($count == 0) {
 					return '';
 				}
 			} else {

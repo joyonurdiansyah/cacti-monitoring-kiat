@@ -26,7 +26,9 @@
 error_reporting(0);
 
 /* get access to the database and open a session */
-include(dirname(__FILE__) . '/../include/cli_check.php');
+include(__DIR__ . '/../include/cli_check.php');
+
+global $cacti_db_session;
 
 $user_logins_valid        = 'U';
 $user_logins_invalid      = 'U';
@@ -59,12 +61,12 @@ if ($cacti_db_session == true) {
 	$session_counter_active = db_fetch_cell_prepared('SELECT count(*)
 		FROM sessions
 		WHERE access >= ?',
-		array($active_interval_begin));
+		[$active_interval_begin]);
 
 	$session_counter_sleeping = db_fetch_cell_prepared('SELECT count(*)
 		FROM sessions
 		WHERE access < ?',
-		array($active_interval_begin));
+		[$active_interval_begin]);
 
 	// These stats have little use when using the database session
 	$user_counter_active     = $session_counter_active;
@@ -77,26 +79,26 @@ if ($cacti_db_session == true) {
 
 	if (file_exists($session_save_path)) {
 		$session_dir_handle  = opendir($session_save_path);
-		$session_maxlifetime = ini_get("session.gc_maxlifetime");
+		$session_maxlifetime = ini_get('session.gc_maxlifetime');
 
 		if ($session_dir_handle) {
-			$user_ids_active          = array();
-			$user_ids_sleeping        = array();
+			$user_ids_active          = [];
+			$user_ids_sleeping        = [];
 			$session_counter_active   = 0;
 			$session_counter_sleeping = 0;
 			$session_counter_garbage  = 0;
 
 			while (false !== ($filename = readdir($session_dir_handle))) {
 				/* a real user session should be greater than 400 Bytes */
-				if (strpos($filename, 'sess_') !== false && filesize($session_save_path . '/' . $filename)> 400) {
+				if (str_contains($filename, 'sess_') && filesize($session_save_path . '/' . $filename) > 400) {
 					$session = file_get_contents($session_save_path . '/' . $filename);
 
 					/* first off check if we are allowed to read the session
 					 * file. Then we are only interested in sessions of
 					 * authenticated Cacti users
 					 */
-					if ($session !== false && strpos($session, 'cacti_cwd') !== false && preg_match('/sess_user_id\|s:[0-9]*:\"[0-9]*\"/', $session, $match)) {
-						$session_user_id = substr($match[0], strpos($match[0], ':"')+2, -1);
+					if ($session !== false && str_contains($session, 'cacti_cwd') && preg_match('/sess_user_id\|s:[0-9]*:\"[0-9]*\"/', $session, $match)) {
+						$session_user_id = substr($match[0], strpos($match[0], ':"') + 2, -1);
 						/* due to the fact that ATIME could be unsupported/disabled we have to use MTIME instead */
 						$mtime = filemtime($session_save_path . '/' . $filename);
 
@@ -110,12 +112,12 @@ if ($cacti_db_session == true) {
 							$session_counter_active++;
 
 							/* count all active users */
-							if (false === ($key = array_search($session_user_id, $user_ids_active))) {
+							if (false === ($key = array_search($session_user_id, $user_ids_active, true))) {
 								$user_ids_active[] = $session_user_id;
 							}
 
 							/* if the same user has more than one session and this one is active then the user is not sleeping */
-							if (false !== ($key = array_search($session_user_id, $user_ids_sleeping))) {
+							if (false !== ($key = array_search($session_user_id, $user_ids_sleeping, true))) {
 								unset($user_ids_sleeping[$key]);
 							}
 
@@ -128,7 +130,7 @@ if ($cacti_db_session == true) {
 							$session_counter_sleeping++;
 
 							/* count all sleeping users if they have no active sessions */
-							if (!in_array($session_user_id, $user_ids_active) && !in_array($session_user_id, $user_ids_sleeping)) {
+							if (!in_array($session_user_id, $user_ids_active, true) && !in_array($session_user_id, $user_ids_sleeping, true)) {
 								$user_ids_sleeping[] = $session_user_id;
 							}
 
@@ -156,8 +158,7 @@ if ($cacti_db_session == true) {
 	}
 }
 
-print
-	'valid:'      . $user_logins_valid .
+print 'valid:'      . $user_logins_valid .
 	' invalid:'   . $user_logins_invalid .
 	' active:'    . $session_counter_active .
 	' sleeping:'  . $session_counter_sleeping .
@@ -169,22 +170,26 @@ function get_session_save_path() {
 	if (session_save_path() !== '') {
 		/* if default temp path is not in use */
 		return realpath(session_save_path());
-	} elseif (function_exists('sys_get_temp_dir')) {
+	}
+
+	if (function_exists('sys_get_temp_dir')) {
 		/* this requires PHP > 5.2.1 */
 		return realpath(sys_get_temp_dir());
-	} elseif ($temp=getenv('TMP') | $temp=getenv('TEMP') | $temp=getenv('TMPDIR')) {
+	}
+
+	if ($temp = getenv('TMP') | $temp = getenv('TEMP') | $temp = getenv('TMPDIR')) {
 		/* try to use environment variables */
 		return $temp;
 	} else {
 		/* try to create a temp file */
-		$temp=tempnam(__FILE__,'');
+		$temp = tempnam(__FILE__,'');
 
 		if (file_exists($temp)) {
 			unlink($temp);
+
 			return dirname($temp);
 		}
 
 		return false;
 	}
 }
-

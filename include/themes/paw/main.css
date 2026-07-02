@@ -75,8 +75,9 @@ img {
 }
 
 i.fa, i.fas, i.fab, i.far, i.fal {
+	font-size: 15px;
 	padding: 0px 3px;
-	font-size: 13px;
+	text-align: left;
 	vertical-align: middle;
 }
 
@@ -88,6 +89,42 @@ fieldset {
 	border: none;
 	padding: 0px;
 	margin: 0px;
+}
+
+.cols1 {
+	width: 100%;
+	display:table-cell;
+}
+
+.cols2 {
+	width: 50%;
+	display:table-cell;
+}
+
+.cols3 {
+	width: 33%;
+	display:table-cell;
+}
+
+.cols4 {
+	width: 25%;
+	display:table-cell;
+}
+
+.cols5 {
+	width: 20%;
+	display:table-cell;
+}
+
+.cols6 {
+	width: 16.6%;
+	display:table-cell;
+}
+
+.graphPage {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-start;
 }
 
 hr.menu {
@@ -146,6 +183,7 @@ label {
 
 .glyph_tab-console:before {
 	content: "\f1b0";
+	display: inline-block;
 }
 
 .text_tab-console {
@@ -154,6 +192,10 @@ label {
 
 .nowrap {
 	white-space: nowrap;
+}
+
+.prewrap {
+	white-space: pre-wrap;
 }
 
 .wrap {
@@ -598,16 +640,17 @@ label {
 }
 
 .even-alternate {
-	#background: none repeat scroll 0 0 #E7E9F2;
-	#background-color: #E7E9F2;
+	/* #background: none repeat scroll 0 0 #E7E9F2;
+	#background-color: #E7E9F2; */
 	border: none;
-	#box-shadow: 0 0 1px rgba(0, 0, 0, 0.1);
+	/* #box-shadow: 0 0 1px rgba(0, 0, 0, 0.1); */
 }
 
 .saveRow {
 	background-color: #EAEAEA;
 	text-align: right;
 	padding: 4px;
+	padding-right: 14px;
 }
 
 .treeArea, .treeItemsArea {
@@ -681,7 +724,7 @@ label {
 	padding: 0px;
 }
 
-.cactiPageHead  div {
+.cactiPageHead div {
 	left: 0;
 	top: 0;
 }
@@ -777,72 +820,50 @@ label {
 	float: left;
 }
 
-.cactiLogo {
-	background: transparent url('./images/cacti_logo.svg') no-repeat 30px;
-	display: none;
-	cursor: pointer;
-	padding-bottom: 140px;
-	margin-bottom: 60px;
-	width: 156px;
-	margin-top: -6px;
-	margin-left: 2px;
-	margin-right: 2px;
+.cactiAuthLogo {
+	display: hidden;
+	position: relative;
+	background: none;
+	#background: transparent url('./images/cacti_logo.svg') no-repeat 30px;
+	width: 130px;
+	height: 148px;
+	z-index: 2;
+	margin-top: -310px;
+	margin-left: 250px;
 }
 
-.loginLeft, .logoutLeft {
-	width: 33%;
-	float: left;
+.cactiAuthTitle {
+	margin-top: 20px;
+	margin-bottom: 10px;
 }
 
-.loginCenter, .logoutCenter {
+.cactiAuthArea {
 	-moz-border-radius: 10px;
 	border-radius: 10px;
-	position: relative;
-	padding: 30px 0px 5px 20px;
+	padding: 15px;
 	background-color: white;
 	top: 30%;
-	max-width: 360px;
+	width: 360px;
 	max-height: 300px;
-	margin-left: auto;
-	margin-right: auto;
-	background: rgba(255,255,255,1);
-	background: -moz-linear-gradient(top, rgba(255,255,255,1) 0%, rgba(246,246,246,1) 47%, rgba(237,237,237,1) 100%);
-	background: -webkit-gradient(left top, left bottom, color-stop(0%, rgba(255,255,255,1)), color-stop(47%, rgba(246,246,246,1)), color-stop(100%, rgba(237,237,237,1)));
-	background: -webkit-linear-gradient(top, rgba(255,255,255,1) 0%, rgba(246,246,246,1) 47%, rgba(237,237,237,1) 100%);
-	background: -o-linear-gradient(top, rgba(255,255,255,1) 0%, rgba(246,246,246,1) 47%, rgba(237,237,237,1) 100%);
-	background: -ms-linear-gradient(top, rgba(255,255,255,1) 0%, rgba(246,246,246,1) 47%, rgba(237,237,237,1) 100%);
-	background: linear-gradient(to bottom, rgba(255,255,255,1) 0%, rgba(246,246,246,1) 47%, rgba(237,237,237,1) 100%);
-	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', endColorstr='#ededed', GradientType=0 );
+	background: rgba(255, 255, 255, 1);
+	background: -moz-linear-gradient(top, rgba(255, 255, 255, 1) 0%, rgba(246, 246, 246, 1) 47%, rgba(237, 237, 237, 1) 100%);
+	background: -webkit-gradient(left top, left bottom, color-stop(0%, rgba(255, 255, 255, 1)), color-stop(47%, rgba(246, 246, 246, 1)), color-stop(100%, rgba(237, 237, 237, 1)));
+	background: -webkit-linear-gradient(top, rgba(255, 255, 255, 1) 0%, rgba(246, 246, 246, 1) 47%, rgba(237, 237, 237, 1) 100%);
+	background: -o-linear-gradient(top, rgba(255, 255, 255, 1) 0%, rgba(246, 246, 246, 1) 47%, rgba(237, 237, 237, 1) 100%);
+	background: -ms-linear-gradient(top, rgba(255, 255, 255, 1) 0%, rgba(246, 246, 246, 1) 47%, rgba(237, 237, 237, 1) 100%);
+	background: linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(246, 246, 246, 1) 47%, rgba(237, 237, 237, 1) 100%);
+	filter: progid: DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', endColorstr='#ededed', GradientType=0);
 }
 
-.cactiLoginLogo, .cactiLogoutLogo {
-	position: relative;
-	z-index: 2;
-	margin-bottom: 0px;
-	color: #223a80;
-	font-size: 48px;
-	float: right;
-}
-
-.cactiLoginLogo i, .cactiLogoutLogo i {
-	margin-right: 10px;
-}
-
-.loginArea, .logoutArea {
-	-moz-border-radius: 10px;
-	border-radius: 10px;
-	position: relative;
-	min-height: 200px;
-}
-
-.cactiLoginTable td {
+.cactiAuthTable td {
 	padding-bottom: 6px;
 	padding-right: 6px;
+	white-space: nowrap;
 }
 
-.loginErrors, .logoutErrors {
+.cactiAuthErrors {
 	color: red;
-	min-height: 15px;
+	min-height: 20px;
 }
 
 legend {
@@ -850,21 +871,26 @@ legend {
 	font-weight: bold;
 }
 
-.loginRight, .logoutRight {
+.cactiAuthRight {
 	width: 33%;
 	float: right;
 }
 
-.loginBody, .logoutBody {
+.cactiAuthBody {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 100%;
+	height: 100%;
 	background: #2d4ca8;
 	background: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiA/Pgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgdmlld0JveD0iMCAwIDEgMSIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGxpbmVhckdyYWRpZW50IGlkPSJncmFkLXVjZ2ctZ2VuZXJhdGVkIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMCUiPgogICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzJkNGNhOCIgc3RvcC1vcGFjaXR5PSIxIi8+CiAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMxYTE5NWUiIHN0b3Atb3BhY2l0eT0iMSIvPgogIDwvbGluZWFyR3JhZGllbnQ+CiAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0idXJsKCNncmFkLXVjZ2ctZ2VuZXJhdGVkKSIgLz4KPC9zdmc+);
 	background: -moz-linear-gradient(left, #2d4ca8 0%, #1a195e 100%);
-	background: -webkit-gradient(linear, left top, right top, color-stop(0%,#2d4ca8), color-stop(100%,#1a195e));
-	background: -webkit-linear-gradient(left, #2d4ca8 0%,#1a195e 100%);
-	background: -o-linear-gradient(left, #2d4ca8 0%,#1a195e 100%);
-	background: -ms-linear-gradient(left, #2d4ca8 0%,#1a195e 100%);
-	background: linear-gradient(to right, #2d4ca8 0%,#1a195e 100%);
-	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#2d4ca8', endColorstr='#1a195e',GradientType=1 );
+	background: -webkit-gradient(linear, left top, right top, color-stop(0%, #2d4ca8), color-stop(100%, #1a195e));
+	background: -webkit-linear-gradient(left, #2d4ca8 0%, #1a195e 100%);
+	background: -o-linear-gradient(left, #2d4ca8 0%, #1a195e 100%);
+	background: -ms-linear-gradient(left, #2d4ca8 0%, #1a195e 100%);
+	background: linear-gradient(to right, #2d4ca8 0%, #1a195e 100%);
+	filter: progid: DXImageTransform.Microsoft.gradient( startColorstr='#2d4ca8', endColorstr='#1a195e', GradientType=1);
 }
 
 .versionInfo {
@@ -892,7 +918,7 @@ legend {
 	vertical-align: top;
 	float: right;
 	margin-left: 3px;
-	margin-right: 5px;
+	padding-right: 14px;
 	display: table-cell;
 }
 
@@ -942,7 +968,7 @@ legend {
 	display: inline-block;
 }
 
-.loginPanel {
+.cactiAuthPanel {
 	padding: 4px 0px;
 }
 
@@ -954,8 +980,21 @@ legend {
 	vertical-align: top;
 }
 
+.graphDrillDown {
+	padding: 10px 3px;
+	display: inline-block;
+	vertical-align: top;
+	align-self: left;
+	z-index: 4;
+	height: 100%;
+	height: 200px;
+	width: 22px;
+	min-width: 22px;
+}
+
 .graphWrapper {
-	position: relative;
+	padding: 10px 3px;
+	display: inline-block;
 }
 
 .cactiGraphContentArea {
@@ -987,7 +1026,6 @@ legend {
 	overflow-y: auto !important;
 	overflow-x: hidden;
 	padding-left: 10px;
-	margin-right: 5px;
 }
 
 .cactiConsoleContentArea>div:last-child {
@@ -1012,7 +1050,7 @@ legend {
 	display: inline-block;
 }
 
-.piinstall, .pienable, .pidisable, .piuninstall, .pierror {
+.piinstall, .pienable, .pidisable, .piuninstall, .pierror, .pirmdata, .piload, .pireadme, .pichangelog, .pirestore, .pirmarchive {
 	padding: 0px 3px !important;
 }
 
@@ -1159,8 +1197,8 @@ legend {
 	text-align: left;
 	display: block;
 	width: 100%;
-	height: 28px;
-	line-height: 28px;
+	height: 25px;
+	line-height: 25px;
 	font-size: 1em;
 	font-weight: 700;
 	background: rgba(0,0,0,0.9);
@@ -1172,9 +1210,8 @@ legend {
 	padding-left: 3px;
 	text-align: left;
 	display: block;
-	width: 70%;
-	height: 28px;
-	line-height: 28px;
+	height: 25px;
+	line-height: 25px;
 	font-size: 1em;
 	font-weight: 700;
 	background: rgba(0,0,0,0.9);
@@ -1185,9 +1222,8 @@ legend {
 	padding: 0px;
 	display: block;
 	text-align: right;
-	width: calc(30% - 3px);
-	height: 28px;
-	line-height: 28px;
+	height: 25px;
+	line-height: 25px;
 	background: rgba(0,0,0,0.9);
 	white-space: nowrap;
 }
@@ -1233,8 +1269,51 @@ legend {
 	white-space: nowrap;
 }
 
-.filterTable label {
+.filterTable td label {
 	vertical-align: 10%;
+}
+
+.filterTable .filterRow {
+	display: table-row;
+}
+
+.filterTable .filterColumn {
+	display: table-cell;
+	padding: 5px 0px 5px 5px;
+	text-align: left;
+}
+
+.filterTable .filterColumn label {
+	vertical-align: -10%;
+}
+
+.filterTable .filterColumnButton {
+	display: table-cell;
+	padding: 5px 0px 5px 5px;
+	text-align: left;
+}
+
+.filterTable .filterColumn:first-child {
+	width: 55px;
+}
+
+.settingsFilter {
+	display: table;
+	white-space: nowrap;
+}
+
+.settingsFilter div {
+	display: table-cell;
+	padding: 5px 0px 5px 5px;
+	vertical-align: middle;
+}
+
+.pingRow {
+	padding-left: 5px;
+	min-height: 50px;
+	vertical-align: text-top;
+	display: table-cell;
+	margin: 0px;
 }
 
 .formRow {
@@ -1263,8 +1342,26 @@ legend {
 	text-align: left;
 }
 
+.confirm_actions .formColumnLeft {
+	min-width: 10%;
+	max-width: 45%;
+	width: initial;
+	display: table-cell;
+	float: initial;
+	vertical-align: middle;
+}
+
+.confirm_actions .formColumnRight {
+	display: table-cell;
+	float: initial;
+}
+
+.confirm_actions label {
+	white-space: wrap;
+}
+
 .formData {
-	display: inline-block;
+	/* display: inline-block; */
 	float: left;
 	text-align: left;
 }
@@ -1292,7 +1389,7 @@ legend {
 }
 
 .formFieldName {
-	display: inline-block;
+	/* display: inline-block; */
 	color: #000000;
 	float: left;
 	text-align: left;
@@ -1316,10 +1413,11 @@ legend {
 	float: left;
 	width: 100%;
 	text-align: left;
-	line-height: 25px;
+	line-height: 22px;
 	background: rgba(0, 0, 0, 0.55) none repeat scroll 0 0;
 	color: white;
 	font-weight: bold;
+	padding: 3px;
 }
 
 .formHeaderText {
@@ -1329,6 +1427,22 @@ legend {
 .formHeaderAnchor {
 	float: right;
 	padding-right: 8px;
+}
+
+.formConfirmRadio {
+	width: 10px;
+}
+
+.formConfirmRow {
+	margin: 3px;
+}
+
+.formConfirmRow td {
+	padding: 3px 8px;
+}
+
+.formConfirmRow td:first-child {
+	width: 1%;
 }
 
 .hostInfoHeader {
@@ -1441,8 +1555,8 @@ th.sortable {
 	font-size: 11px;
 	font-weight: bold;
 	padding: 0px 2px;
-	height: 28px;
-	line-height: 28px;
+	height: 25px;
+	line-height: 25px;
 }
 
 .tableHeader th.sortable {
@@ -1451,7 +1565,7 @@ th.sortable {
 
 .tableHeader th div {
 	display: block;
-	padding-right: 8px;
+	padding-right: 0px;
 	font-size: 11px;
 }
 
@@ -1480,7 +1594,7 @@ th.sortable {
 }
 
 .graphSubHeaderColumn {
-	color: #white;
+	/* color: #white; */
 	font-size: 12px;
 	vertical-align: middle;
 	text-align: left;
@@ -1491,11 +1605,6 @@ th.sortable {
 	max-width: 20px;
 	width: 20px;
 	background: #3F75A2;
-}
-
-.tableRowGraph td {
-	padding: 3px;
-	vertical-align: top;
 }
 
 .tableRow td {
@@ -1592,7 +1701,7 @@ th.sortable {
 }
 
 .popupBox {
-	#z-index: 2;
+	/* #z-index: 2; */
 	position: absolute;
 	padding: 0px;
 	display: none;
@@ -1685,6 +1794,8 @@ th.sortable {
 	vertical-align: middle;
 	text-decoration: none !important;
 	padding-right: 7px !important;
+	display: inline-block !important;
+	width: 14.75px !important;
 }
 
 .deleteMarker:hover {
@@ -1696,6 +1807,8 @@ th.sortable {
 	vertical-align: middle;
 	text-decoration: none !important;
 	padding-right: 7px !important;
+	display: inline-block !important;
+	width: 14.75px !important;
 }
 
 .deleteMarkerDisabled:hover {
@@ -1705,8 +1818,8 @@ th.sortable {
 .moveArrow {
 	color: #00438C !important;
 	height: 14px !important;
-	display: inline-block;
-	width: 11.75px;
+	display: inline-block !important;
+	width: 14.75px !important;
 	font-size: 14px !important;
 	vertical-align: middle;
 	text-decoration: none !important;
@@ -1717,8 +1830,8 @@ th.sortable {
 }
 
 .moveArrowNone {
-	display: inline-block;
-	width: 14.75px;
+	display: inline-block !important;
+	width: 14.75px !important;
 }
 
 .action, .shiftArrow, .calendar {
@@ -1761,7 +1874,7 @@ div#gtabs {
 
 .usertabs {
 	float: right !important;
-	width: 80px;
+	width: 85px;
 	white-space: nowrap;
 }
 
@@ -1811,7 +1924,7 @@ div#gtabs {
 	float: left !important;
 	text-decoration: none;
 	font-size: 18px;
-	vertical-align: bottom;
+	/* vertical-align: bottom; */
 	display: block;
 }
 
@@ -1902,6 +2015,14 @@ div.submenu span {
 	padding: 0;
 }
 
+tr td:last-child .checkbox {
+	margin-right: 10px !important;
+}
+
+tr th:last-child .checkbox {
+	margin-right: 10px !important;
+}
+
 /* Navigation Area */
 #nav {
 	float: left;
@@ -1972,18 +2093,6 @@ tr th:last-child .checkbox {
 	margin-right: 10px !important;
 }
 
-.fa-angle-double-up, .fa-angle-double-down {
-	margin-right: 10px;
-}
-
-.fa-plus, .fa-question-circle {
-	margin-right: 10px;
-}
-
-.fa-compress, .fa-expand {
-	margin-right: 10px;
-}
-
 #nav li a.pic:hover:not(.selected) {
 	background: rgba(224,224,224,1);
 }
@@ -2015,8 +2124,7 @@ ul#nav {
 }
 
 .clogError {
-	color: #ccc;
-	background-color: #6f0a07;
+	background-color: #FF3932;
 }
 
 .clogWarning {
@@ -2068,6 +2176,10 @@ ul#nav {
 	opacity: 0.95;
 	border-radius: 5px !important;
 	border: transparent;
+}
+
+.ui-selectmenu-search input {
+	width: 100%;
 }
 
 div.preformatted {
@@ -2199,10 +2311,12 @@ tr#realtime td:first-child {
 }
 
 .menu_glyph {
-	font-size: 12px;
+	font-size: 15px !important;
 	vertical-align: middle;
 	text-align: left;
-	width: 20px;
+	width: 22px;
+	padding-right: 0px !important;
+	display: inline-block;
 }
 
 .menuitem span {
@@ -2437,12 +2551,95 @@ td.center > table {
 	color: #FFFFFF !important;
 }
 
-[id*='_edit'] .tableRowGraph:hover {
-     background-color: rgba(0, 0, 255, .3) !important;
-     border-left: 2px solid yellow !important;
-     border-right: 2px solid yellow !important;
+[id*='_edit'] .tableHeader:hover {
+	background-color: rgba(0, 0, 255, .3) !important;
+	border-left: 2px solid yellow !important;
+	border-right: 2px solid yellow !important;
 }
 
-.tableRowGraph {
-     border: 2px solid rgba(0,0,0,0);
+.tableHeaderGraph {
+	background: rgba(0, 0, 0, 0.9);
 }
+
+.tableHeaderGraph span {
+	padding: 3px;
+	line-height: 25px;
+	color: #FFFFFF;
+}
+
+.actionHelp {
+	color:#00758F !important;
+}
+
+.plusAdd {
+	color:#CE3500 !important;
+}
+
+.actionCog {
+	color:#FDAC53 !important;
+}
+
+.fileCSV {
+	color:#9BB7D4 !important;
+}
+
+.threeBars {
+	color:#B55A30 !important;
+}
+
+.editDevice {
+	color:#F5DF4D !important;
+}
+
+.editTemplate {
+	color:#0072B5 !important;
+}
+
+.realTime {
+	color:#A0DAA9 !important;
+}
+
+.spikeKill {
+	color:#E9897E !important;
+}
+
+.newDevice {
+	color:#00A170 !important;
+}
+
+.newGraph {
+	color:#926AA6 !important;
+}
+
+.reindexDevice {
+	color:#D2386C !important;
+}
+
+.enableDebug {
+	color:#363945 !important;
+}
+
+.disableDebug {
+	color:#939597 !important;
+}
+
+.repopulateCache {
+	color:#EFE1CE !important;
+}
+
+.viewCache {
+	color:#E0B589 !important;
+}
+
+.viewGraphs {
+	color:#9A8B4F !important;
+}
+
+.viewSources {
+	color:#56C6A9 !important;
+}
+
+.expandAggregate {
+	color:#9BB7D4 !important;
+}
+

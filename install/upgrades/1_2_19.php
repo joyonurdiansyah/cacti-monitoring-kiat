@@ -22,7 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
-function upgrade_to_1_2_19() {
+function upgrade_to_1_2_19() : void {
 	// Correct name values in data input fields
 	db_install_execute("UPDATE data_input_fields
 		SET name='SNMP Authentication Protocol (v3)'
@@ -42,10 +42,11 @@ function upgrade_to_1_2_19() {
 
 	// Add missing indexes to graph_templates_item table
 	$alter   = '';
-	$indexes = array('cdef_id', 'vdef_id', 'color_id', 'gprint_id', 'local_graph_template_item_id');
-	foreach($indexes as $i) {
+	$indexes = ['cdef_id', 'vdef_id', 'color_id', 'gprint_id', 'local_graph_template_item_id'];
+
+	foreach ($indexes as $i) {
 		if (!db_index_exists('graph_templates_item', $i, false)) {
-			$alter .= ($alter != '' ? ', ':'') . " ADD INDEX $i($i)";
+			$alter .= ($alter != '' ? ', ' : '') . " ADD INDEX $i($i)";
 		}
 	}
 

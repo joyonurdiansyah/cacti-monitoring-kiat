@@ -32,18 +32,18 @@ if (function_exists('pcntl_async_signals')) {
 ini_set('output_buffering', 'Off');
 
 require(__DIR__ . '/include/cli_check.php');
-require_once($config['base_path'] . '/lib/poller.php');
-require_once($config['base_path'] . '/lib/boost.php');
-require_once($config['base_path'] . '/lib/dsstats.php');
+require_once(CACTI_PATH_LIBRARY . '/poller.php');
+require_once(CACTI_PATH_LIBRARY . '/boost.php');
+require_once(CACTI_PATH_LIBRARY . '/dsstats.php');
 
-/*  display_version - displays version information */
-function display_version() {
-	$version = get_cacti_version();
+// display_version - displays version information
+function display_version() : void {
+	$version = get_cacti_cli_version();
 	print "Cacti Boost RRD Update Poller, Version $version " . COPYRIGHT_YEARS . "\n";
 }
 
-/*	display_help - displays the usage of the function */
-function display_help () {
+// display_help - displays the usage of the function
+function display_help() : void {
 	display_version();
 
 	print "\nusage: poller_recovery.php [--verbose] [--force] [--debug]\n\n";
@@ -55,24 +55,22 @@ function display_help () {
 	print "    --debug   - Display verbose output during execution\n\n";
 }
 
-function sig_handler($signo) {
+function sig_handler(int $signo) : void {
 	switch ($signo) {
 		case SIGTERM:
 		case SIGINT:
 			cacti_log('RECOVERY WARNING: Recovery Poller terminated by user', false, 'POLLER');
 
-			/* tell the main poller that we are done */
-			db_execute("REPLACE INTO settings (name, value) VALUES ('boost_poller_status', 'terminated - end time:" . date('Y-m-d G:i:s') ."')");
+			// tell the main poller that we are done
+			db_execute("REPLACE INTO settings (name, value) VALUES ('boost_poller_status', 'terminated - end time:" . date('Y-m-d G:i:s') . "')");
 
 			exit;
-			break;
 		default:
-			/* ignore all other signals */
+			// ignore all other signals
 	}
-
 }
 
-function debug($string) {
+function debug(string $string) : void {
 	global $debug;
 
 	if ($debug) {
@@ -91,21 +89,21 @@ if (isset($packet_data['Value'])) {
 	$max_allowed_packet = 1E6;
 }
 
-/* process calling arguments */
+// process calling arguments
 $parms = $_SERVER['argv'];
 array_shift($parms);
 
 $debug          = false;
 $forcerun       = false;
 $verbose        = false;
-$poller_id      = $config['poller_id'];
+$poller_id      = POLLER_ID;
 
 if (cacti_sizeof($parms)) {
-	foreach($parms as $parameter) {
-		if (strpos($parameter, '=')) {
-			list($arg, $value) = explode('=', $parameter);
+	foreach ($parms as $parameter) {
+		if (str_contains($parameter, '=')) {
+			[$arg, $value] = explode('=', $parameter, 2);
 		} else {
-			$arg = $parameter;
+			$arg   = $parameter;
 			$value = '';
 		}
 
@@ -113,60 +111,69 @@ if (cacti_sizeof($parms)) {
 			case '-d':
 			case '--debug':
 				$debug = true;
+
 				break;
 			case '-f':
 			case '--force':
 				$forcerun = true;
+
 				break;
 			case '--verbose':
 				$verbose = true;
+
 				break;
 			case '--version':
 			case '-V':
 			case '-v':
 				display_version();
+
 				exit;
 			case '--help':
 			case '-H':
 			case '-h':
 				display_help();
+
 				exit;
+
 			default:
 				print 'ERROR: Invalid Parameter ' . $parameter . "\n\n";
 				display_help();
+
 				exit;
 		}
 	}
 }
 
-/* check for an invalid run location */
-if ($poller_id == 1) {
+// check for an invalid run location
+if ($poller_id == 1 && !defined('PHP_TESTING')) {
 	print "ERROR: This command is only to be run on remote Cacti Data Collectors\n";
+
 	exit(1);
 }
 
-/* install signal handlers for UNIX only */
+// install signal handlers for UNIX only
 if (function_exists('pcntl_signal')) {
 	pcntl_signal(SIGTERM, 'sig_handler');
 	pcntl_signal(SIGINT, 'sig_handler');
 }
 
-/* take time and log performance data */
+// take time and log performance data
 $start = microtime(true);
 
-/* configuration variables */
+// configuration variables
 $record_limit = 150000;
 $sleep_time   = 1;
 
-/* global counter variables */
+// global counter variables
 $records_inserted = 0;
 
 debug('About to start recovery processing');
 
 if (!empty($recovery_pid)) {
 	$pid = posix_kill($recovery_pid, 0);
+
 	if ($pid === false) {
-		/* we found a stale PID, so we delete it from the table */
+		// we found a stale PID, so we delete it from the table
 		db_execute("DELETE FROM settings WHERE name='recovery_pid'", true, $local_db_cnn_id);
 
 		$run = true;
@@ -185,18 +192,18 @@ if ($run) {
 	db_execute_prepared('REPLACE INTO settings
 		(name, value)
 		VALUES ("recovery_pid", ?)',
-		array($my_pid), true, $local_db_cnn_id);
+		[$my_pid], true, $local_db_cnn_id);
 
-	/* let the console know you are in recovery mode */
+	// let the console know you are in recovery mode
 	db_execute_prepared('UPDATE poller
 		SET status = "5"
 		WHERE id = ?',
-		array($poller_id), true, $remote_db_cnn_id);
+		[$poller_id], true, $remote_db_cnn_id);
 
 	poller_push_reindex_data_to_poller(0, 0, true);
 
 	while (true) {
-		cacti_log('RECOVERY: Getting max_time for '. $record_limit . ' records.', false, 'POLLER');
+		cacti_log('RECOVERY: Getting max_time for ' . $record_limit . ' records.', false, 'POLLER');
 
 		$max_time = db_fetch_cell("SELECT MAX(time)
 			FROM (
@@ -217,17 +224,17 @@ if ($run) {
 				FROM poller_output_boost
 				WHERE time <= ?
 				ORDER BY time ASC, local_data_id ASC',
-				array($max_time));
+				[$max_time]);
 
 			if (cacti_sizeof($rows)) {
 				$packet_size = 0;
-				$sql_array   = array();
+				$sql_array   = [];
 
-				foreach($rows as $r) {
-					$sql = '(' . $r['local_data_id'] . ',' . db_qstr($r['rrd_name']) . ',' . db_qstr($r['time']) . ',' . db_qstr($r['output']) . ')';
+				foreach ($rows as $r) {
+					$sql      = '(' . $r['local_data_id'] . ',' . db_qstr($r['rrd_name']) . ',' . db_qstr($r['time']) . ',' . db_qstr($r['output']) . ')';
 					$sql_size = strlen($sql);
 
-					/* if adding a new row would exceed max_allowed_packet, send the current frame to the main poller and start a new frame */
+					// if adding a new row would exceed max_allowed_packet, send the current frame to the main poller and start a new frame
 					if (($packet_size + $sql_size) >= $max_allowed_packet) {
 						$record_count = cacti_sizeof($sql_array);
 
@@ -238,7 +245,7 @@ if ($run) {
 							VALUES ' . implode(',', $sql_array), true, $remote_db_cnn_id);
 
 						$records_inserted += $record_count;
-						$sql_array = array();
+						$sql_array   = [];
 						$packet_size = 0;
 					}
 
@@ -246,24 +253,24 @@ if ($run) {
 					$packet_size += $sql_size;
 				}
 
-				/* if there is data in the last frame, send it to main poller as well and finalize */
+				// if there is data in the last frame, send it to main poller as well and finalize
 				if ($packet_size > 0) {
 					$record_count = cacti_sizeof($sql_array);
 
 					cacti_log('RECOVERY: Writing ' . $record_count . ' records (' . $packet_size . ' bytes) to main (last slice).', false, 'POLLER');
 
-					db_execute("INSERT IGNORE INTO poller_output_boost
+					db_execute('INSERT IGNORE INTO poller_output_boost
 						(local_data_id, rrd_name, time, output)
-						VALUES " . implode(',', $sql_array), true, $remote_db_cnn_id);
+						VALUES ' . implode(',', $sql_array), true, $remote_db_cnn_id);
 
 					$records_inserted += $record_count;
 				}
 
-				/* remove the recovery records */
+				// remove the recovery records
 				if (is_object($local_db_cnn_id)) {
 					db_execute_prepared('DELETE FROM poller_output_boost
 						WHERE time <= ?',
-						array($max_time), true, $local_db_cnn_id);
+						[$max_time], true, $local_db_cnn_id);
 				}
 			}
 
@@ -271,13 +278,14 @@ if ($run) {
 		}
 	}
 
-	/* let the console know you are in online mode */
+	// let the console know you are in online mode
 	db_execute_prepared('UPDATE poller
 		SET status="2"
-		WHERE id= ?', array($poller_id), false, $remote_db_cnn_id);
+		WHERE id= ?', [$poller_id], false, $remote_db_cnn_id);
 } else {
 	debug('Recovery process still running, exiting');
 	cacti_log('RECOVERY: Recovery process still running for Poller ' . $poller_id . '.  PID is ' . $recovery_pid, false, 'POLLER');
+
 	exit(1);
 }
 

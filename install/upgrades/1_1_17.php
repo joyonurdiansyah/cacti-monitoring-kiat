@@ -22,7 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
-function upgrade_to_1_1_17() {
+function upgrade_to_1_1_17() : void {
 	// Finalize fix to LDAP authentication
 	db_install_execute('UPDATE user_auth SET realm=3 WHERE realm=1');
 
@@ -30,15 +30,15 @@ function upgrade_to_1_1_17() {
 		db_install_execute('ALTER TABLE data_source_profiles_rra
 			ADD COLUMN timespan int(10) unsigned NOT NULL DEFAULT "0"');
 
-		$rras_results = db_install_fetch_assoc("SELECT * FROM data_source_profiles_rra");
+		$rras_results = db_install_fetch_assoc('SELECT * FROM data_source_profiles_rra');
 		$rras         = $rras_results['data'];
 
 		if (cacti_sizeof($rras)) {
-			foreach($rras as $rra) {
+			foreach ($rras as $rra) {
 				$interval_results = db_install_fetch_cell('SELECT step
 					FROM data_source_profiles
 					WHERE id = ?',
-					array($rra['data_source_profile_id']));
+					[$rra['data_source_profile_id']]);
 				$interval = $interval_results['data'];
 
 				$timespan = $rra['steps'] * $interval * $rra['rows'];
@@ -48,7 +48,7 @@ function upgrade_to_1_1_17() {
 				db_install_execute('UPDATE data_source_profiles_rra
 					SET timespan = ?
 					WHERE id = ?',
-					array($timespan, $rra['id']));
+					[$timespan, $rra['id']]);
 			}
 		}
 	}

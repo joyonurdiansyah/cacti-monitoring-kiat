@@ -34,6 +34,7 @@
   var optgroupClass = 'ui-multiselect-optgroup';
   var groupLabelClass = 'ui-multiselect-grouplabel';
   var hiddenClass = 'ui-multiselect-excluded';
+  var searchClass = 'ui-state-default ui-corner-all';
 
   /**
    * This comes courtesy of underscore.js
@@ -62,7 +63,6 @@
   }
 
   $.widget('ech.multiselectfilter', {
-
     options: {
       label: 'Filter:', // (string) The label to show with the input
       placeholder: 'Enter keywords', // (string) The placeholder text to show in the input
@@ -102,7 +102,8 @@
         .css({width: (typeof opts.width === 'string')
                        ? this.instance._parse2px(opts.width, this.$header).px + 'px'
                        : (/\d/.test(opts.width) ? opts.width + 'px' : null),
-             });
+             })
+		.addClass(searchClass);
       this._bindInputEvents();
       // automatically reset the widget on close?
       if (this.options.autoReset) {

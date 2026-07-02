@@ -22,7 +22,9 @@
  +-------------------------------------------------------------------------+
 */
 
-define('CACTI_PHP_VERSION_MINIMUM', '5.4.0');
+define('CACTI_PHP_VERSION_MINIMUM', '7.4.0');
+
+define('CACTI_DEV_VERSION','1.3.0.99.1593739325');
 
 define('CACTI_ESCAPE_CHARACTER', '"');
 define('COPYRIGHT_YEARS', 'Copyright (C) 2004-' . date('Y') . ' The Cacti Group');
@@ -83,6 +85,8 @@ define('DATA_INPUT_TYPE_SNMP_QUERY', 3);
 define('DATA_INPUT_TYPE_SCRIPT_QUERY', 4);
 define('DATA_INPUT_TYPE_PHP_SCRIPT_SERVER', 5);
 define('DATA_INPUT_TYPE_QUERY_SCRIPT_SERVER', 6);
+define('DATA_INPUT_TYPE_STREAM', 7);
+define('DATA_INPUT_TYPE_STREAM_QUERY', 8);
 
 define('GRAPH_ITEM_TYPE_COMMENT',            1);
 define('GRAPH_ITEM_TYPE_HRULE',              2);
@@ -103,10 +107,41 @@ define('GRAPH_ITEM_TYPE_LINESTACK',         20);
 define('GRAPH_ITEM_TYPE_TIC',               30);
 define('GRAPH_ITEM_TYPE_TEXTALIGN',         40);
 
-/* used both for polling and reindexing */
+define('POLLER_DELETE', 1);
+define('POLLER_DISABLE', 2);
+define('POLLER_ENABLE', 3);
+define('POLLER_RESYNC', 4);
+define('POLLER_CLEAR_STATS', 5);
+define('POLLER_AUTHSYNC', 6);
+
+// common user interface actions
+define('ACTION_ADD', 1);
+define('ACTION_DELETE', 2);
+define('ACTION_ENABLE', 3);
+define('ACTION_DISABLE', 4);
+define('ACTION_DUPLICATE', 5);
+define('ACTION_EXPORT', 6);
+define('ACTION_IMPORT', 7);
+define('ACTION_CANCEL', 8);
+define('ACTION_REAPPLY', 9);
+define('ACTION_PUBLISH', 10);
+define('ACTION_UNPUBLISH', 11);
+define('ACTION_LOCK', 12);
+define('ACTION_UNLOCK', 13);
+define('ACTION_ASSOCIATE', 14);
+define('ACTION_DISASSOCIATE', 15);
+define('ACTION_RUNNOW', 16);
+define('ACTION_CLEAR_STATS', 17);
+define('ACTION_SYNC', 18);
+define('ACTION_FULLSYNC', 19);
+define('ACTION_QUICKSYNC', 20);
+define('ACTION_CHANGE', 21);
+
+// used both for polling and reindexing
 define('POLLER_ACTION_SNMP', 0);
 define('POLLER_ACTION_SCRIPT', 1);
 define('POLLER_ACTION_SCRIPT_PHP', 2);
+define('POLLER_ACTION_NONE', 99);
 
 /* used for reindexing only:
  * in case we do not have OID_NUM_INDEXES|ARG_NUM_INDEXES
@@ -143,6 +178,7 @@ define('AVAIL_PING', 3);
 define('AVAIL_SNMP_OR_PING', 4);
 define('AVAIL_SNMP_GET_SYSDESC', 5);
 define('AVAIL_SNMP_GET_NEXT', 6);
+define('AVAIL_STREAM', 7);
 
 define('PING_ICMP', 1);
 define('PING_UDP', 2);
@@ -188,7 +224,7 @@ define('GT_PREV_YEAR', 28);
 
 define('DEFAULT_TIMESPAN', 86400);
 
-# graph timeshifts
+// graph timeshifts
 define('GTS_CUSTOM', 0);
 define('GTS_HALF_HOUR', 1);
 define('GTS_1_HOUR', 2);
@@ -212,7 +248,7 @@ define('GTS_2_YEARS', 19);
 
 define('DEFAULT_TIMESHIFT', 86400);
 
-# weekdays according to date('w') builtin function
+// weekdays according to date('w') builtin function
 define('WD_SUNDAY', 	date('w',strtotime('sunday')));
 define('WD_MONDAY', 	date('w',strtotime('monday')));
 define('WD_TUESDAY', 	date('w',strtotime('tuesday')));
@@ -238,9 +274,9 @@ define('CVDEF_ITEM_TYPE_SPEC_DS', 4);
 define('CVDEF_ITEM_TYPE_CDEF', 5);
 define('CVDEF_ITEM_TYPE_STRING', 6);
 
-define('SNMP_POLLER', 0);
-define('SNMP_CMDPHP', 1);
-define('SNMP_WEBUI', 2);
+define('SNMP_POLLER', 'POLLER');
+define('SNMP_CMDPHP', 'CMDPHP');
+define('SNMP_WEBUI', 'WEBUI');
 
 define('OPER_MODE_NATIVE', 0);
 define('OPER_MODE_RESKIN', 1);
@@ -258,6 +294,18 @@ define('SNMPAGENT_EVENT_SEVERITY_LOW', 1);
 define('SNMPAGENT_EVENT_SEVERITY_MEDIUM', 2);
 define('SNMPAGENT_EVENT_SEVERITY_HIGH', 3);
 define('SNMPAGENT_EVENT_SEVERITY_CRITICAL', 4);
+
+define('INPUT_VALIDATION_NONE', '');
+define('INPUT_VALIDATION_LOG', 'on');
+define('INPUT_VALIDATION_FULL', 'full');
+
+define('LOG_EXPAND_FULL', 0);
+define('LOG_EXPAND_NONE', 1);
+define('LOG_EXPAND_DISPLAY', 2);
+
+define('LOG_ACTION_PURGE', 1);
+define('LOG_ACTION_ROTATE', 2);
+define('LOG_ACTION_PURGE_ROTATE', 3);
 
 define('CLOG_PERM_ADMIN', 0);
 define('CLOG_PERM_USER',  1);
@@ -281,9 +329,6 @@ define('REPORTS_TYPE_INLINE_GIF', 3);
 define('REPORTS_TYPE_ATTACH_PNG', 11);
 define('REPORTS_TYPE_ATTACH_JPG', 12);
 define('REPORTS_TYPE_ATTACH_GIF', 13);
-define('REPORTS_TYPE_INLINE_PNG_LN', 91);
-define('REPORTS_TYPE_INLINE_JPG_LN', 92);
-define('REPORTS_TYPE_INLINE_GIF_LN', 93);
 
 define('REPORTS_ITEM_GRAPH', 1);
 define('REPORTS_ITEM_TEXT',  2);
@@ -320,7 +365,14 @@ define('REPORTS_OUTPUT_EMAIL',  2);
 
 define('REPORTS_DEFAULT_MAX_SIZE', 10485760);
 
-# unless a hook for 'global_constants' is available, all DEFINEs go here
+define('SCHEDULE_MANUAL',         1);
+define('SCHEDULE_DAILY',          2);
+define('SCHEDULE_WEEKLY',         3);
+define('SCHEDULE_MONTHLY',        4);
+define('SCHEDULE_MONTHLY_ON_DAY', 5);
+define('SCHEDULE_HOURLY',         6);
+
+// unless a hook for 'global_constants' is available, all DEFINEs go here
 define('AGGREGATE_GRAPH_TYPE_KEEP',          0);
 define('AGGREGATE_GRAPH_TYPE_KEEP_STACKED', 50);
 define('AGGREGATE_GRAPH_TYPE_LINE1_STACK',  51);
@@ -372,17 +424,24 @@ define('AUTOMATION_RULE_TYPE_GRAPH_ACTION', 2);
 define('AUTOMATION_RULE_TYPE_TREE_MATCH', 3);
 define('AUTOMATION_RULE_TYPE_TREE_ACTION', 4);
 
-# pseudo table name required as long as Data Query XML resides in files
+// pseudo table name required as long as Data Query XML resides in files
 define('AUTOMATION_RULE_TABLE_XML', 'XML');
 
 define('AUTOMATION_ACTION_GRAPH_DUPLICATE', 1);
 define('AUTOMATION_ACTION_GRAPH_ENABLE', 2);
 define('AUTOMATION_ACTION_GRAPH_DISABLE', 3);
+define('AUTOMATION_ACTION_GRAPH_EXPORT', 4);
 define('AUTOMATION_ACTION_GRAPH_DELETE', 99);
+
 define('AUTOMATION_ACTION_TREE_DUPLICATE', 1);
 define('AUTOMATION_ACTION_TREE_ENABLE', 2);
 define('AUTOMATION_ACTION_TREE_DISABLE', 3);
+define('AUTOMATION_ACTION_TREE_EXPORT', 4);
 define('AUTOMATION_ACTION_TREE_DELETE', 99);
+
+define('AUTOMATION_LOG_LOW', 1);
+define('AUTOMATION_LOG_MEDIUM', 2);
+define('AUTOMATION_LOG_HIGH', 3);
 
 if (isset($database_type) && $database_type == 'mysql') {
 	define('SQL_NO_CACHE', 'SQL_NO_CACHE');
@@ -398,7 +457,7 @@ define('FILTER_VALIDATE_IS_REGEX',             99999);
 define('FILTER_VALIDATE_IS_NUMERIC_ARRAY',    100000);
 define('FILTER_VALIDATE_IS_NUMERIC_LIST',     100001);
 
-/* socket errors */
+// socket errors
 define('ENOTSOCK',        88);
 define('EDESTADDRREQ',    89);
 define('EMSGSIZE',        90);
@@ -450,6 +509,7 @@ if (!defined('PASSWORD_DEFAULT')) {
 define('CACTI_MAIL_PHP', 0);
 define('CACTI_MAIL_SENDMAIL', 1);
 define('CACTI_MAIL_SMTP', 2);
+define('CACTI_MAIL_OAUTH2', 3);
 
 define('DAYS_FORMAT_SHORT', 0);
 define('DAYS_FORMAT_MEDIUM', 1);
@@ -464,7 +524,6 @@ define('GRAPH_SOURCE_AGGREGATE', 3);
 
 define('CACTI_LANGUAGE_HANDLER_DEFAULT', 0);
 define('CACTI_LANGUAGE_HANDLER_PHPGETTEXT', 1);
-define('CACTI_LANGUAGE_HANDLER_OSCAROTERO', 2);
 define('CACTI_LANGUAGE_HANDLER_MOTRANSLATOR', 3);
 
 if (!defined('LDAP_OPT_X_TLS_NEVER')) {
@@ -475,10 +534,128 @@ if (!defined('LDAP_OPT_X_TLS_NEVER')) {
 	define('LDAP_OPT_X_TLS_TRY', 4);
 }
 
+define('CACTI_VERSION_FORMAT_SHORT', 0);
+define('CACTI_VERSION_FORMAT_FULL', 1);
 
-/* HTML/JS/URL/CSS context labels for cacti_html_context_escape() */
-define('CACTI_ESC_ELEMENT',   'element');
-define('CACTI_ESC_ATTR',      'attr');
-define('CACTI_ESC_JS_STRING', 'js_string');
-define('CACTI_ESC_URL',       'url');
-define('CACTI_ESC_CSS',       'css');
+define('AUTH_METHOD_NONE', 0);
+define('AUTH_METHOD_CACTI', 1);
+define('AUTH_METHOD_BASIC', 2);
+define('AUTH_METHOD_LDAP', 3);
+define('AUTH_METHOD_DOMAIN', 4);
+
+define('DOMAIN_TYPE_LDAP', 1);
+define('DOMAIN_TYPE_AD', 2);
+
+define('OPTIONS_WEB', 'sess_config_array');
+define('OPTIONS_CLI', 'config_options_array');
+define('OPTIONS_USER', 'sess_user_config_array');
+
+define('CACTI_SESSION_NAME', 'cacti_session_name');
+define('CACTI_CWD', 'cacti_cwd');
+
+define('SESS_USER_2FA', 'sess_user_2fa');
+define('SESS_USER_ID', 'sess_user_id');
+define('SESS_USER_AGENT', 'sess_user_agent');
+define('SESS_USER_LANGUAGE', 'sess_user_language');
+define('SESS_USER_REALMS', 'sess_user_realms');
+define('SESS_AUTH_NAMES', 'sess_auth_names');
+define('SESS_CLIENT_ADDR', 'sess_client_addr');
+define('SESS_CHANGE_PASSWORD', 'sess_change_password');
+
+/** Session Permission Constants */
+define('SESS_USER_PERMS_KEY', 'sess_user_perms_key');
+define('SESS_SIMPLE_PERMS', 'sess_simple_perms');
+define('SESS_SIMPLE_TEMPLATE_PERMS', 'sess_simple_template_perms');
+define('SESS_TREE_PERMS', 'sess_tree_perms');
+
+define('SESS_ERROR_FIELDS', 'sess_error_fields');
+define('SESS_FIELD_VALUES', 'sess_field_values');
+define('SESS_MESSAGES', 'sess_messages');
+
+define('SESS_BROWSER_PHP_TZ', 'sess_browser_php_tz');
+define('SESS_PHP_TZ', 'sess_php_tz');
+define('SESS_BROWSER_SYSTEM_TZ', 'sess_browser_system_tz');
+define('SESS_SYSTEM_TZ', 'sess_system_tz');
+
+// Cookie options
+define('COOKIE_OPTIONS', 'cookie_options');
+define('COOKIE_OPTIONS_DOMAIN', 'cookie_domain');
+define('COOKIE_OPTIONS_SAMESITE', 'cookie_samesite');
+define('COOKIE_OPTIONS_SECURE', 'cookie_secure');
+define('COOKIE_OPTIONS_HTTPONLY', 'cookie_httponly');
+define('COOKIE_OPTIONS_PATH', 'cookie_path');
+define('COOKIE_OPTIONS_STRICT', 'use_strict_mode');
+
+// constants primarily of use in the CLI.
+if (defined('CACTI_CLI_ONLY')) {
+	define('CLI_BEL',                       "\x7");  // bell: beep and/or flash
+	define('CLI_TAB',                       "\x9");  // tab (also available as \t)
+	define('CLI_CR',                        "\xD");  // carriage return (also available as \r)
+	define('CLI_ESC',                      "\x1B");  // yes, your escape button sends this
+
+	// control characters primarily of use for TUI's. Search the net for a
+	// comprehensive reference on these, in here we need to be brief. basically
+	// you'll begin with a CSI, followed by parameters, and end with a particular
+	// "command" (which essientially dictates what the preceding parameters do).
+	define('CLI_CSI',            CLI_ESC . "\x9B");  // begin a control sequence
+
+	// these are shorthands and conclude a sequence directly
+	define('CLI_EL_WHOLE',                   '2K');  // clear whole line
+
+	// SGR sequences can be combined by delimiting them with semicolons.
+	define('CLI_SGR_END',                     'm');  // concludes an SGR sequence
+	define('CLI_SGR_RESET',                     0);  // reset all SGR attrs
+	define('CLI_SGR_BOLD',                      1);  // bold
+	define('CLI_SGR_DIM',                       2);  // dim
+	define('CLI_SGR_BLINK',                     5);  // slow blink
+	define('CLI_SGR_BLINK_FAST',	            6);  // rapid blink
+
+	// color. these are SGR sequences, so as noted above, those need to
+	// be concluded with CLI_SGR_END. omitted 'SGR' from constant name to keep at
+	// least some semblance of brevity.
+	// basic 8 foreground colors
+	define('CLI_FG_BLACK',                     30);
+	define('CLI_FG_RED',                       31);
+	define('CLI_FG_GREEN',                     32);
+	define('CLI_FG_YELLOW',                    33);
+	define('CLI_FG_BLUE',                      34);
+	define('CLI_FG_MAGENTA',                   35);
+	define('CLI_FG_CYAN',                      36);
+	define('CLI_FG_WHITE',                     37);
+
+	// basic 8 foreground colors, bright
+	define('CLI_FG_BRIGHT_BLACK',              90);
+	define('CLI_FG_BRIGHT_RED',                91);
+	define('CLI_FG_BRIGHT_GREEN',              92);
+	define('CLI_FG_BRIGHT_YELLOW',             93);
+	define('CLI_FG_BRIGHT_BLUE',               94);
+	define('CLI_FG_BRIGHT_MAGENTA',            95);
+	define('CLI_FG_BRIGHT_CYAN',               96);
+	define('CLI_FG_BRIGHT_WHITE',              97);
+
+	// basic 8 background colors
+	define('CLI_BG_BLACK',                     40);
+	define('CLI_BG_RED',                       41);
+	define('CLI_BG_GREEN',                     42);
+	define('CLI_BG_YELLOW',                    43);
+	define('CLI_BG_BLUE',                      44);
+	define('CLI_BG_MAGENTA',                   45);
+	define('CLI_BG_CYAN',                      46);
+	define('CLI_BG_WHITE',                     47);
+
+	// basic 8 background colors, bright
+	define('CLI_BG_BRIGHT_BLACK',             100);
+	define('CLI_BG_BRIGHT_RED',               101);
+	define('CLI_BG_BRIGHT_GREEN',             102);
+	define('CLI_BG_BRIGHT_YELLOW',            103);
+	define('CLI_BG_BRIGHT_BLUE',              104);
+	define('CLI_BG_BRIGHT_MAGENTA',           105);
+	define('CLI_BG_BRIGHT_CYAN',              105);
+	define('CLI_BG_BRIGHT_WHITE',             107);
+
+	// 256 color sequence. these need to be followed by a colour number,
+	// and finished just like above with CLI_SGR_END.
+	// available colors are documented widely in the web.
+	define('CLI_CSI_FG_256COL', CLI_CSI . '38;5;'); // foreground
+	define('CLI_CSI_BG_256COL', CLI_CSI . '48;5;'); // background
+}
