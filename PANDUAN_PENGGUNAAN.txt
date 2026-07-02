@@ -1,0 +1,738 @@
+
+================================================================================
+  PANDUAN PENGGUNAAN CACTI 1.2.31
+  Monitoring Multi-Site — 84 Device, 19 Branch
+================================================================================
+
+  URL  : http://localhost/cacti-monitoring/
+  Login: joyo / joyo12345
+
+================================================================================
+  DAFTAR ISI
+================================================================================
+
+  1.  Setup Spesifik Instalasi Saya
+  2.  Istilah-Istilah Dasar (Data Source, Data Query, dll)
+  3.  Cara Tambah Device Baru
+  4.  Cara Buat Tree / Struktur Folder Baru
+  5.  Cara Generate Graph untuk Device yang Sudah Ada
+  6.  Cara Lihat dan Baca Graph
+  7.  Cara Cek Status Polling / Troubleshoot Device Down
+  8.  Cara Setup Threshold / Alert (Thold)
+  9.  Cara Backup dan Restore
+  10. Cara Pakai Weathermap Plugin
+
+
+================================================================================
+  1. SETUP SPESIFIK INSTALASI SAYA
+================================================================================
+
+  Info penting instalasi Cacti ini. Catat atau bookmark halaman ini.
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │ ITEM                  NILAI                                         │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │ URL Cacti             http://localhost/cacti-monitoring/            │
+  │ Username              joyo                                          │
+  │ Password              joyo12345                                     │
+  │ Versi Cacti           1.2.31                                        │
+  │ Lokasi Project        C:\laragon\Course\AI\Web Project\Documents\  │
+  │                       cacti-monitoring\                             │
+  │                                                                     │
+  │ PHP                   8.3.23 (nts)                                  │
+  │ PHP binary            C:\laragon\bin\php\php-8.3.23-nts-Win32-     │
+  │                       vs16-x64\php.exe                              │
+  │ php.ini               C:\laragon\bin\php\php-8.3.23-nts-Win32-     │
+  │                       vs16-x64\php.ini                              │
+  │                                                                     │
+  │ Database              MySQL (Laragon)                               │
+  │ DB Host               localhost:3306                                │
+  │ DB Name               cacti                                         │
+  │ DB User               cactiuser                                     │
+  │ DB Password           (lihat include/config.php)                    │
+  │                                                                     │
+  │ RRDtool               C:\laragon\bin\rrdtool\rrdtool.exe           │
+  │ RRD version           1.9.0                                         │
+  │ RRA folder            ...\cacti-monitoring\rra\                     │
+  │                                                                     │
+  │ SNMP binary           C:\usr\bin\snmpwalk.exe (dan snmpget, dll)   │
+  │ SNMP default          v2c, community "public", port 161             │
+  │                                                                     │
+  │ Spine                 c:\spine\bin\spine.exe                        │
+  │ Poller type           cmd.php (type 1)                              │
+  │ Poller interval       300 detik (5 menit)                           │
+  │                                                                     │
+  │ Log file              ...\cacti-monitoring\log\cacti.log            │
+  │ Log stderr            ...\cacti-monitoring\log\cacti_stderr.log    │
+  │                                                                     │
+  │ URL path              /cacti-monitoring/                            │
+  │ Jumlah device         84 device                                     │
+  │ Jumlah branch tree    19 branch (per kota)                          │
+  │                                                                     │
+  │ Plugin Weathermap     v1.5 — aktif                                  │
+  │ Plugin Thold          Bawaan Cacti (terintegrasi)                   │
+  └─────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+  2. ISTILAH-ISTILAH DASAR (Bahasa Awam)
+================================================================================
+
+  2.1 Device (Perangkat)
+      ====================
+      Benda yang dimonitor — bisa router Mikrotik, switch, server, AP
+      Ubiquiti, dll. Setiap device punya IP Address dan dikonfigurasi
+      dengan SNMP agar Cacti bisa ambil datanya.
+
+  2.2 Device Template
+      ===================
+      Template yang menentukan cara Cacti berkomunikasi dengan device.
+      Contoh:
+      - "Generic SNMP Device"  → untuk device standar SNMP
+      - "Windows Device"       → untuk server Windows (pakai SNMP)
+      - "Mikrotik RouterOS"   → untuk router Mikrotik (ada MIB khusus)
+      - "Linux Host"           → untuk server Linux
+
+  2.3 Data Query
+      ==============
+      Cara Cacti "nanya" ke device untuk dapetin data. Contoh Data Query:
+      "Interface Statistics" → ambil data semua interface (traffic in/out)
+      Data Query otomatis mendeteksi interface yang ada di device, lalu
+      bikin graph untuk masing-masing interface.
+
+  2.4 Data Source
+      ==============
+      Satu "kolom data" tunggal. Misal:
+      - Traffic IN pada interface ether1 → 1 Data Source
+      - Traffic OUT pada interface ether1 → 1 Data Source
+      - CPU Load → 1 Data Source
+      Setiap Data Source disimpan di file .rrd (RRD file).
+
+  2.5 Graph Template
+      ==================
+      Template tampilan graph. Contoh:
+      "Interface Traffic" → graph dengan 2 garis (traffic in = hijau,
+      traffic out = biru), sumbu Y bps.
+      Template ini menentukan warna, label, tipe grafik, dan data source
+      mana yang ditampilkan.
+
+  2.6 RRA (Round Robin Archive)
+      ============================
+      Cara RRDtool menyimpan data. Bayangkan seperti "kotak-kotak" yang:
+      - 1 kotak = 1 data point (misal rata-rata 5 menit)
+      - Cacti simpan banyak kotak: 2 jam terakhir (data per 5 menit),
+        1 minggu (data per 30 menit), 1 tahun (data per 2 jam), dll.
+      Makin lama timeframenya, makin jarang data point-nya (sudah di-
+      rata-ratakan). Ini yang bikin graph bisa nampilin dari real-time
+      sampai tahunan tanpa makan banyak disk.
+
+  2.7 Poller
+      ==========
+      "Tukang pos" Cacti. Setiap 5 menit, poller jalan:
+      1. Ambil daftar device yang perlu di-polling
+      2. Kirim SNMP request ke tiap device
+      3. Ambil balikannya (traffic, CPU, dll)
+      4. Simpan ke RRD file
+      5. Generate/update graph
+      Kalau poller mati, data berhenti masuk → graph flat/datar.
+
+  2.8 Tree
+      ========
+      Struktur folder untuk mengelompokkan device. Di instalasi ini,
+      tree "Default Tree" punya 19 folder/branch sesuai kota.
+      Berguna untuk navigasi cepat di menu Graphs.
+
+
+================================================================================
+  3. CARA TAMBAH DEVICE BARU UNTUK DIMONITOR
+================================================================================
+
+  3.1 Persiapan: Cek SNMP Perangkat
+      ==============================
+      Sebelum tambah device di Cacti, pastikan SNMP sudah aktif di
+      perangkat tujuan.
+
+      Untuk Mikrotik (via WinBox/SSH):
+        /snmp community set [find] address=0.0.0.0/0
+        /snmp set enabled=yes trap-community=public
+
+      Untuk Linux:
+        sudo apt install snmpd
+        sudo systemctl enable --now snmpd
+
+      Untuk Windows:
+        Control Panel > Programs > Turn Windows features on/off >
+        Simple Network Management Protocol (SNMP) > Install
+        Lalu konfigurasi Services > SNMP Service > Security >
+        Tambah community "public"
+
+  3.2 Langkah Tambah Device
+      ======================
+      1. Login ke Cacti (http://localhost/cacti-monitoring/)
+      2. Menu kiri: Console > Create > NEW DEVICE
+         (atau langsung klik Devices di bawah Management, lalu
+          tombol Add kanan atas)
+
+      3. Isi field wajib:
+         ┌───────────────────────┬────────────────────────────────────┐
+         │ Field                 │ Isi                                │
+         ├───────────────────────┼────────────────────────────────────┤
+         │ Description           │ Nama device (misal: R225-MKA-01)  │
+         │ Hostname              │ IP address device                  │
+         │ Device Template       │ Pilih sesuai tipe device (lihat    │
+         │                       │ 3.3)                               │
+         │ SNMP Version          │ Version 2 (paling umum)            │
+         │ SNMP Community        │ public (sesuai konfigurasi device) │
+         │ SNMP Port             │ 161                                │
+         │ SNMP Timeout          │ 500 (ms)                           │
+         │ SNMP Retries          │ 3                                  │
+         │ Availability/Reach    │ "SNMP" atau "SNMP and Ping"        │
+         │                       │ (recommended: SNMP and Ping)       │
+         │ Ping Method           │ TCP Ping (port 22 atau 80)         │
+         └───────────────────────┴────────────────────────────────────┘
+
+      4. Klik tombol CREATE (pojok kanan bawah)
+
+  3.3 Kapan Pakai Device Template Apa?
+      =================================
+      ┌─────────────────────┬────────────────────────────────────────┐
+      │ Device Template     │ Kapan Dipakai                          │
+      ├─────────────────────┼────────────────────────────────────────┤
+      │ Generic SNMP Device │ Default kalau gak ada template khusus. │
+      │                     │ Untuk switch, AP, printer, dll.        │
+      ├─────────────────────┼────────────────────────────────────────┤
+      │ Mikrotik RouterOS   │ Untuk router/switch Mikrotik.          │
+      │                     │ Otomatis ambil interface, resource,     │
+      │                     │ dan disk.                               │
+      ├─────────────────────┼────────────────────────────────────────┤
+      │ Windows Device      │ Untuk server Windows (wajib SNMP       │
+      │                     │ service aktif). Graph: interface,      │
+      │                     │ disk, memory, CPU.                     │
+      ├─────────────────────┼────────────────────────────────────────┤
+      │ Linux Host          │ Untuk server Linux (wajib snmpd aktif).│
+      │                     │ Graph: interface, load, memory, disk.  │
+      └─────────────────────┴────────────────────────────────────────┘
+
+  3.4 Test Konektivitas SNMP Sebelum Save
+      ====================================
+      Sebelum klik Create, kamu bisa test dari command line:
+
+        snmpwalk -v 2c -c public 192.168.1.x .1.3.6.1.2.1.1
+
+      Kalau muncul informasi device (nama, uptime, dll) → SNMP OK.
+      Kalau timeout → periksa firewall, community string, atau
+      IP address.
+
+  3.5 Associate Data Query (Supaya Graph Interface Otomatis Muncul)
+      =============================================================
+      Setelah device tersimpan, secara otomatis Cacti akan
+      menjalankan Data Query yang terdaftar di Device Template-nya.
+
+      Untuk cek/manual associate:
+      1. Buka Console > Management > Devices
+      2. Klik nama device yang baru ditambahkan
+      3. Scroll ke bagian "Host SNMP Options" dan lihat tabel
+         "Associated Data Queries"
+      4. Kalau ada Data Query (misal "Interface Statistics"),
+         klik ikon "Verbose Query" (tooltip: "Verbose Query")
+         untuk lihat hasil query real-time — kalau muncul daftar
+         interface, berarti sukses.
+      5. Klik SAVE
+
+      Setelah poller jalan (5 menit sekali), graph otomatis
+      tergenerate untuk setiap interface yang terdeteksi.
+
+      Kalau tidak ada Data Query sama sekali, kamu bisa ADD manual:
+      - Di halaman edit device, scroll ke "Associated Data Queries"
+      - Klik ADD, pilih Data Query dari dropdown
+      - Contoh: "Interface Statistics" → pilih
+      - Klik CONTINUE, lalu SAVE
+
+
+================================================================================
+  4. CARA BUAT TREE / STRUKTUR FOLDER BARU
+================================================================================
+
+  4.1 Buat Tree Baru
+      ===============
+      1. Console > Management > Graph Trees
+      2. Klik ADD (kanan atas)
+      3. Isi:
+         ┌──────────────┬─────────────────────────────────────────────┐
+         │ Name         | Nama tree (misal: "Regional Monitoring")    │
+         │ Sort Type    | "Manual Ordering (No Sorting)" (biar bisa   │
+         │              |  atur sendiri urutannya)                    │
+         │ Authentication| Optional — biarkan kosong (semua user bisa │
+         │              |  lihat)                                     │
+         └──────────────┴─────────────────────────────────────────────┘
+      4. Klik CREATE
+
+  4.2 Buat Branch / Folder di Dalam Tree
+      ===================================
+      Setelah tree dibuat:
+
+      1. Console > Management > Graph Trees
+      2. Klik nama tree
+      3. Di halaman edit tree, ada tabel "Tree Items"
+      4. Pilih dropdown "Add Graph Tree Item":
+         - "Header" (branch/folder) — pilih ini
+      5. Isi:
+         ┌──────────────┬─────────────────────────────────────────────┐
+         │ Item         | Pilih "Header" (berarti folder)             │
+         │ Name         | Nama branch (misal: "JAKARTA")              │
+         │ Order        | Urutan (1, 2, 3...)                        │
+         │ Parent Item  | Biarkan "None" (root level) atau pilih      │
+         │              | parent folder kalau mau nested             │
+         └──────────────┴─────────────────────────────────────────────┘
+      6. Klik CREATE
+
+  4.3 Assign Device ke Branch
+      ========================
+      Cara paling gampang — dari halaman edit tree yang sama:
+
+      1. Console > Management > Graph Trees
+      2. Klik nama tree
+      3. Pilih dropdown "Add Graph Tree Item":
+         - "Host" (device) — pilih ini
+      4. Isi:
+         ┌──────────────┬─────────────────────────────────────────────┐
+         │ Item         | Pilih "Host"                                │
+         │ Host         | Pilih device dari dropdown                  │
+         │ Order        | Urutan dalam branch                         │
+         │ Parent Item  | Pilih Header yang sudah dibuat (branch)     │
+         └──────────────┴─────────────────────────────────────────────┘
+      5. Klik CREATE
+
+      Ulangi untuk setiap device yang mau dimasukkan ke branch.
+
+  4.4 Bedanya Sorting Type
+      =====================
+      ┌──────────────────┬───────────────────────────────────────────┐
+      │ Sorting Type     │ Efek                                      │
+      ├──────────────────┼───────────────────────────────────────────┤
+      │ Manual Ordering  │ Kamu atur sendiri urutan tiap item        │
+      │ (No Sorting)     │ (pake field Order). Paling fleksibel.     │
+      ├──────────────────┼───────────────────────────────────────────┤
+      │ Alphabetical     │ Urut otomatis A-Z berdasarkan nama.       │
+      ├──────────────────┼───────────────────────────────────────────┤
+      │ Natural Order    │ Seperti alphabetical tapi "P10" ditaruh   │
+      │                  │ setelah "P9" (bukan setelah "P1").       │
+      └──────────────────┴───────────────────────────────────────────┘
+
+      Di instalasi ini pakai Manual Ordering supaya urutan branch
+      sesuai keinginan (R225-MKA, P3, _GATEWAY_, ...).
+
+
+================================================================================
+  5. CARA GENERATE GRAPH UNTUK DEVICE YANG SUDAH ADA
+================================================================================
+
+  5.1 Cek Data Query yang Terasosiasi
+      ================================
+      1. Console > Management > Devices
+      2. Klik nama device
+      3. Scroll ke "Associated Data Queries"
+      4. Lihat daftar Data Query yang aktif
+
+      Untuk cek hasil query:
+      - Klik ikon "Verbose Query" (rantai/gear) di sebelah Data Query
+      - Kalau muncul daftar interface → data query sukses
+      - Kalau error "No SNMP response" → cek SNMP perangkat
+
+  5.2 Create Graphs for this Host
+      =============================
+      Kalau device sudah punya Data Query tapi ada interface yang
+      belum dibuat graph-nya:
+
+      1. Console > Create > NEW GRAPHS
+      2. Di dropdown "Device", pilih device yang dimaksud
+      3. Akan muncul daftar semua Data Query yang terasosiasi
+      4. Centang interface yang BELUM ada graph-nya (kolom paling
+         kiri, kotak ceklis)
+      5. Klik CREATE (kanan atas)
+
+      Tunggu 1-2 siklus poller (5-10 menit), graph akan muncul.
+
+  5.3 Bedanya Graph dari Template vs Data Query
+      ==========================================
+      ┌──────────────────┬───────────────────────────────────────────┐
+      │ Dari Template    │ Dari Data Query                           │
+      ├──────────────────┼───────────────────────────────────────────┤
+      │ Graph dibuat     │ Graph otomatis tergenerate untuk setiap  │
+      │ manual satu-     │ item yang terdeteksi (misal tiap interface│
+      │ per-satu.        │ otomatis dapat graph). Paling praktis.   │
+      ├──────────────────┼───────────────────────────────────────────┤
+      │ Cocok untuk data │ Cocok untuk data yang jumlahnya dinamis  │
+      │ yang sifatnya    │ (interface bisa nambah/hilang).          │
+      │ tetap (misal CPU │                                          │
+      │ temperature).    │                                          │
+      └──────────────────┴───────────────────────────────────────────┘
+
+
+================================================================================
+  6. CARA LIHAT DAN BACA GRAPH
+================================================================================
+
+  6.1 Navigasi Graph
+      ===============
+      1. Klik menu atas GRAPHS (bukan Console)
+      2. Di sidebar kiri ada pilihan:
+         - "Tree Mode" → lihat berdasarkan tree/branch (default)
+         - "List Mode" → semua device dalam satu daftar
+         - "Preview Mode" → thumbnail semua graph
+
+  6.2 Filter Berdasarkan Tree
+      ========================
+      1. Di sidebar kiri, klik "Tree Mode"
+      2. Akan muncul tree structure (Default Tree)
+      3. Klik branch (misal "BALI") untuk lihat graph device di Bali
+      4. Klik nama device untuk lihat semua graph device itu
+
+  6.3 Ganti Timeframe
+      =================
+      Di atas graph ada tombol:
+      - 1h (1 jam), 2h, 4h, 6h
+      - 1d (1 hari) — default
+      - 1w (1 minggu), 1m (1 bulan), 1y (1 tahun)
+
+      Atau klik calendar icon untuk custom range.
+
+  6.4 Zoom ke Detail
+      ===============
+      Klik kiri + drag di area graph untuk zoom ke rentang waktu
+      tertentu. Klik kanan untuk reset.
+
+  6.5 Export Graph
+      ==============
+      1. Kiri bawah graph ada dropdown "Graph Actions"
+      2. Pilih:
+         - "Download Image (.png)" → export gambar
+         - "Print View" → tampilan untuk di-print
+         - "View Source Data" → lihat data mentah (CSV)
+
+      Atau klik kanan graph → "Save image as..." (via browser).
+
+
+================================================================================
+  7. CARA CEK STATUS POLLING / TROUBLESHOOT DEVICE "UNKNOWN" ATAU DOWN
+================================================================================
+
+  7.1 Cek Status Device
+      ==================
+      1. Console > Management > Devices
+      2. Di kolom "Status":
+         - "UP"   → device merespons
+         - "DOWN" → device tidak merespons SNMP/ping
+         - "UNKNOWN" → belum pernah di-poll atau ada error
+
+  7.2 Lihat Log Poller
+      =================
+      1. Console > Utilities > SYSTEM UTILITIES
+      2. Klik "View Cacti Log"
+      3. Atau buka langsung file:
+         ...\cacti-monitoring\log\cacti.log
+         (bisa pakai Notepad++ atau tail)
+
+      Filter log untuk device tertentu:
+        grep "R225-MKA" log/cacti.log
+
+      Log penting untuk dicari:
+        - "POLLER:" → status poller tiap siklus
+        - "SNMP error" → masalah SNMP
+        - "Device Down" → device tidak reachable
+        - "ERROR:" → error umum
+        - "WARNING:" → peringatan
+
+  7.3 Cara Baca Error di Log
+      =======================
+      ┌─────────────────────────────┬────────────────────────────────┐
+      │ Log Message                 │ Artinya                        │
+      ├─────────────────────────────┼────────────────────────────────┤
+      │ SNMP error                   │ Device tidak balas SNMP. Cek  │
+      │                              │ community, IP, firewall       │
+      ├─────────────────────────────┼────────────────────────────────┤
+      │ Ping resulted in host being │ Device mati total atau kabel   │
+      │ DOWN                        │ lepas                          │
+      ├─────────────────────────────┼────────────────────────────────┤
+      │ RRDtool ERROR               │ File .rrd korup atau path      │
+      │                              │ salah. Coba rebuild.          │
+      ├─────────────────────────────┼────────────────────────────────┤
+      │ Empty result from           │ Data Query gagal — cek SNMP    │
+      │ data query                  │ walk manual.                   │
+      └─────────────────────────────┴────────────────────────────────┘
+
+  7.4 Manual Trigger Poller (Tanpa Nunggu Cron)
+      ==========================================
+      Dari command line (buka Terminal Laragon):
+
+        php C:\laragon\Course\AI\Web Project\Documents\cacti-monitoring\poller.php
+
+      Tunggu sampai selesai (biasanya 10-30 detik untuk 84 device).
+      Kalau muncul "OK" di akhir → poller sukses.
+
+      Untuk polling 1 device tertentu saja (lebih cepat):
+
+        php cli/add_device.php --description="..." --hostname="..."
+
+      Atau rebuild cache:
+
+        php cli/rebuild_poller_cache.php
+
+  7.5 Device "UNKNOWN" Setelah Ditambah
+      ==================================
+      1. Cek SNMP dari command line:
+           snmpwalk -v 2c -c public <IP_DEVICE> .1.3.6.1.2.1.1
+      2. Cek apakah device bisa di-ping:
+           ping <IP_DEVICE>
+      3. Cek log Cacti:
+           grep <IP_DEVICE> log/cacti.log
+      4. Cek field SNMP di halaman edit device:
+         - SNMP Version: v2c
+         - Community: public (case sensitive!)
+         - Port: 161
+         - Timeout: 500 (naikkan ke 1000 kalau device lambat)
+      5. Klik SAVE, lalu cek status setelah poller berikutnya
+
+
+================================================================================
+  8. CARA SETUP THRESHOLD / ALERT (THOLD PLUGIN)
+================================================================================
+
+  Thold adalah plugin bawaan Cacti untuk membuat notifikasi/alert
+  kalau data melebihi batas tertentu.
+
+  8.1 Buat Threshold Baru
+      ====================
+      1. Console > Templates > THRESHOLD TEMPLATES
+         (atau langsung Threshold > Add Threshold)
+      2. Klik ADD
+      3. Isi field:
+         ┌──────────────────────┬────────────────────────────────────┐
+         │ Field                │ Isi                                │
+         ├──────────────────────┼────────────────────────────────────┤
+         │ Name                 │ Nama threshold (misal: "Traffic    │
+         │                      │ High - R225")                      │
+         │ Data Source          │ Pilih Data Source yang mau         │
+         │                      │ dimonitor (misal: traffic_in pada  │
+         │                      │ interface tertentu)                │
+         │ Threshold Type       │ Pilih: "High/Low Threshold"        │
+         │ High Threshold       │ Batas atas (misal: 80000000 =      │
+         │                      │ 80Mbps)                            │
+         │ Low Threshold        │ Batas bawah (misal: 0)             │
+         │ Trigger Count        │ Berapa kali berturut-turut sebelum │
+         │                      │ alert dikirim (misal: 2)           │
+         │ Trigger Duration     │ 300 (5 menit)                      │
+         │ Notifications        │ Email atau alert lainnya            │
+         └──────────────────────┴────────────────────────────────────┘
+      4. Klik CREATE
+
+  8.2 Kapan Notifikasi Terkirim
+      ==========================
+      - Notifikasi dikirim SETELAH data melebihi threshold selama
+        "Trigger Count" kali berturut-turut (bukan langsung saat
+        pertama kali).
+      - Misal: High Threshold = 80Mbps, Trigger Count = 3.
+        → Traffic 85Mbps di poll 1 → belum alert
+        → Traffic 82Mbps di poll 2 → belum alert
+        → Traffic 90Mbps di poll 3 → alert! (3 kali berturut-turut)
+      - Setelah kondisi normal kembali selama "Trigger Duration",
+        threshold di-reset dan siap alert lagi.
+
+  8.3 Konfigurasi Email Notifikasi
+      ==============================
+      1. Console > Configuration > Settings > Thresholds
+      2. Atau > Mail/Reporting/DNS untuk setting email server
+      3. Isi SMTP server, email pengirim, email tujuan
+
+
+================================================================================
+  9. CARA BACKUP DAN RESTORE
+================================================================================
+
+  9.1 Apa Saja yang Perlu di-Backup
+      ==============================
+      Ada 3 komponen yang wajib di-backup:
+
+      ┌─────────────────────────────┬────────────────────────────────┐
+      │ Komponen                    │ Lokasi                         │
+      ├─────────────────────────────┼────────────────────────────────┤
+      │ 1. Database Cacti           │ MySQL database "cacti"         │
+      │ 2. RRD files                │ rra/ (semua file .rrd)         │
+      │ 3. Config file              │ include/config.php             │
+      └─────────────────────────────┴────────────────────────────────┘
+
+  9.2 Cara Backup Database
+      =====================
+      Buka Terminal Laragon, jalankan:
+
+        mysqldump -u cactiuser -p cacti > backup-cacti-2024-01-01.sql
+
+      (ketik password database cacti saat diminta)
+
+      Lebih baik pakai --opt --routines --events:
+
+        mysqldump -u cactiuser -p --opt --routines --events cacti > backup-cacti.sql
+
+  9.3 Cara Backup RRD Files
+      ========================
+      Copy folder rra/:
+
+        xcopy /E /I rra\ backup-rra-2024-01-01\
+
+      Atau pakai zip:
+
+        tar -czf backup-rra.tar.gz rra/
+
+  9.4 Cara Backup Config
+      ====================
+      Cukup copy include/config.php:
+
+        copy include\config.php backup-config.php
+
+  9.5 Cara Restore
+      ==============
+      Kalau terjadi masalah:
+
+      1. Restore database:
+           mysql -u cactiuser -p cacti < backup-cacti.sql
+
+      2. Restore RRD files:
+           copy backup-rra-xxx\*.* rra\ (overwrite)
+
+      3. Pastikan include/config.php masih benar (atau restore dari
+         backup).
+
+      4. Rebuild poller cache:
+           php cli/rebuild_poller_cache.php
+
+      5. Jalankan poller manual:
+           php poller.php
+
+  9.6 Backup Cepat (Daily)
+      =====================
+      Script simpel untuk backup harian (run dari Task Scheduler):
+
+        @echo off
+        set BACKUP_DIR=C:\backup-cacti
+        set DATE=%date:~-4%%date:~-7,2%%date:~-10,2%
+        mkdir %BACKUP_DIR%\%DATE%
+        mysqldump -u cactiuser -pPASSWORD cacti > %BACKUP_DIR%\%DATE%\database.sql
+        xcopy /E /I rra %BACKUP_DIR%\%DATE%\rra\
+        copy include\config.php %BACKUP_DIR%\%DATE%\
+
+
+================================================================================
+  10. CARA PAKAI WEATHERMAP PLUGIN
+================================================================================
+
+  10.1 Akses Weathermap
+       =================
+      1. Login ke Cacti
+      2. Klik tab "Weathermap" di menu atas
+         (kalau tidak muncul, reload halaman setelah enable plugin)
+
+  10.2 Manage Maps
+       ============
+      1. Console > Management > Weathermaps (di sidebar kiri)
+      2. Di sini kamu lihat daftar map yang sudah ada
+      3. Klik ADD untuk menambahkan file .conf yang sudah ada
+         di folder configs/
+      4. Atau klik NEW untuk buat file .conf baru dari UI
+
+  10.3 Edit Map (Editor)
+       ==================
+      Klik nama map → akan terbuka editor visual:
+
+      CARA GAMBAR TOPOLOGI:
+      1. Tambah NODE:
+         - Klik kanan di canvas → "Add Node"
+         - Atur posisi dengan drag & drop
+         - Isi label (nama device), icon, warna
+
+      2. Tambah LINK (garis):
+         - Klik kanan → "Add Link"
+         - Atau drag dari node A ke node B (kalau editor support)
+         - Atur bandwidth (misal 100M, 1G)
+         - Pilih TARGET → ini yang menghubungkan ke data source
+
+      3. HUBUNGKAN KE DATA TRAFFIC:
+         - Di properties LINK, ada field "TARGET"
+         - Isi dengan salah satu format:
+           * DS:ID (ambil dari URL Data Source Cacti)
+           * /path/file.rrd:dsname:cf
+           * Cari via "Data Source" button di editor
+         - Begitu terhubung, warna garis akan otomatis berubah
+           sesuai traffic: hijau (<25%), kuning (25-50%),
+           oranye (50-75%), merah (>75%)
+
+  10.4 Contoh File .conf Sederhana
+       ============================
+      Ada contoh di: plugins/weathermap/configs/simple.conf
+      dan di: plugins/weathermap/docs/example/example.conf
+
+  10.5 Hal Penting
+       ============
+      - Weathermap HARUS digambar manual — plugin tidak tahu
+        topologi fisik jaringan.
+      - Kamu harus gambar sendiri posisi node dan garis koneksi
+        sesuai topologi asli.
+      - Warna garis otomatis berdasarkan data real-time dari
+        Data Source Cacti.
+      - Badge (CPU/Latency/PktLoss) bisa ditambahkan sebagai
+        LABEL atau NOTES di NODE, ambil data dari graph ID.
+
+
+================================================================================
+  LAMPIRAN: TREE STRUCTURE SAAT INI
+================================================================================
+
+  Default Tree
+  ├── R225-MKA           │ Mikrotik R225
+  ├── P3                 │ Pangkalan 3
+  ├── _GATEWAY_          │ Gateway, Azure, Web server, DNS
+  ├── P5                 │ Pangkalan 5 — Bekasi
+  ├── P6                 │ Pangkalan 6 — Bekasi
+  ├── P12                │ Pangkalan 12 — Cileungsi
+  ├── PEKANBARU          │ R.202 Pekanbaru
+  ├── PALU               │ Distribusi, Sw Core, R.211
+  ├── BALI               │ R.243 Bali
+  ├── BANJARMASIN        │ R.210 Banjarmasin
+  ├── BATAM              │ R.201 Batam
+  ├── SEMARANG           │ Bacbone, R.205, Ubiquiti AP
+  ├── MAKASSAR           │ ASTINET, R.237, R.239
+  ├── MUARABARU          │ Quantum RAS, R.240
+  ├── PALEMBANG          │ R.204 Palembang
+  ├── MEDAN              │ R.212 Medan
+  ├── MANADO             │ R.209 Manado
+  ├── SURABAYA           │ Krian, Tambaksawah
+  └── BALIKPAPAN         │ Bacbone, CS, Distribusi, SW Core
+
+
+================================================================================
+  LAMPIRAN: PERINTAH CLI BERGUNA
+================================================================================
+
+  Semua perintah dijalankan dari folder project.
+
+  ┌──────────────────────────────────────┬──────────────────────────┐
+  │ Perintah                             │ Fungsi                   │
+  ├──────────────────────────────────────┼──────────────────────────┤
+  │ php poller.php                       │ Jalankan poller manual   │
+  │ php cli/rebuild_poller_cache.php     │ Rebuild cache setelah    │
+  │                                      │ perubahan device massal  │
+  │ php cli/add_device.php ...           │ Tambah device via CLI    │
+  │ php cli/remove_device.php ...        │ Hapus device via CLI     │
+  │ php cli/add_tree.php ...             │ Kelola tree via CLI      │
+  │ php cli/add_graphs.php ...           │ Tambah graph via CLI     │
+  │ php cli/poller_output_empty.php      │ Kosongkan buffer output  │
+  │                                      │ poller (kalau ada macet) │
+  │ php cli/upgrade_database.php         │ Upgrade DB ke versi baru │
+  │ php cli/repair_database.php          │ Repair DB jika ada error │
+  │ php cli/plugin_manage.php --install  │ Install/aktifkan plugin  │
+  │ --plugin=xxx --enable                │                          │
+  └──────────────────────────────────────┴──────────────────────────┘
+
+
+================================================================================
+  End of PANDUAN PENGGUNAAN CACTI
+================================================================================
